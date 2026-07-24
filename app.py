@@ -145,6 +145,7 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     if trajanje % INTERVAL_MIN != 0:
         broj_slotova += 1
     
+    # 1. Dohvati vremena slotova
     c.execute("""
         SELECT vreme FROM rezervacije 
         WHERE datum=? AND vreme >= ? AND ime IS NULL 
@@ -157,19 +158,16 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
         conn.close()
         return False
     
-    for i in range(broj_slotova - 1):
-        t1 = datetime.strptime(vremena[i], "%H:%M")
-        t2 = datetime.strptime(vremena[i+1], "%H:%M")
-        if (t2 - t1).seconds // 60 != INTERVAL_MIN:
-            conn.close()
-            return False
+    # 2. Obriši te prazne slotove
+    for vreme in vremena:
+        c.execute("DELETE FROM rezervacije WHERE datum=? AND vreme=? AND ime IS NULL", (datum, vreme))
     
+    # 3. Ubaci nove slotove sa imenom klijenta
     for vreme in vremena:
         c.execute("""
-            UPDATE rezervacije 
-            SET ime=?, telefon=?, usluga=?, cena=?, naplaceno=0 
-            WHERE datum=? AND vreme=?
-        """, (ime, telefon, usluga, cena, datum, vreme))
+            INSERT INTO rezervacije (usluga, datum, vreme, ime, telefon, cena, naplaceno, datum_naplate)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+        """, (usluga, datum, vreme, ime, telefon, cena, None))
     
     conn.commit()
     conn.close()
@@ -358,6 +356,7 @@ with tab2:
         c.execute("SELECT * FROM rezervacije ORDER BY datum, vreme")
         svi = c.fetchall()
         if svi:
+            st.write("📋 Svi redovi u bazi:")
             for red in svi:
                 st.write(red)
         else:
