@@ -77,7 +77,8 @@ def generisi_slotove_za_dan(datum_str):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    c.execute("DELETE FROM rezervacije WHERE datum=?", (datum_str,))
+    # 🔥 BRIŠEMO SAMO PRAZNE SLOTOVE (ne i zauzete)
+    c.execute("DELETE FROM rezervacije WHERE datum=? AND ime IS NULL", (datum_str,))
     
     sat_start, min_start = RADNO_VREME[0]
     sat_kraj, min_kraj = RADNO_VREME[1]
@@ -141,37 +142,16 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    broj_slotova = trajanje // INTERVAL_MIN
-    if trajanje % INTERVAL_MIN != 0:
-        broj_slotova += 1
-    
-    # 1. Dohvati vremena slotova
+    # 🔥 DIREKTAN INSERT - bez brisanja slotova
     c.execute("""
-        SELECT vreme FROM rezervacije 
-        WHERE datum=? AND vreme >= ? AND ime IS NULL 
-        ORDER BY vreme ASC LIMIT ?
-    """, (datum, pocetak, broj_slotova))
-    
-    vremena = [row[0] for row in c.fetchall()]
-    
-    if len(vremena) < broj_slotova:
-        conn.close()
-        return False
-    
-    # 2. Obriši te prazne slotove
-    for vreme in vremena:
-        c.execute("DELETE FROM rezervacije WHERE datum=? AND vreme=? AND ime IS NULL", (datum, vreme))
-    
-    # 3. Ubaci nove slotove sa imenom klijenta
-    for vreme in vremena:
-        c.execute("""
-            INSERT INTO rezervacije (usluga, datum, vreme, ime, telefon, cena, naplaceno, datum_naplate)
-            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
-        """, (usluga, datum, vreme, ime, telefon, cena, None))
+        INSERT INTO rezervacije (usluga, datum, vreme, ime, telefon, cena, naplaceno, datum_naplate)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+    """, (usluga, datum, pocetak, ime, telefon, cena, None))
     
     conn.commit()
     conn.close()
     
+    # Provera
     conn2 = sqlite3.connect('termini.db')
     c2 = conn2.cursor()
     c2.execute("SELECT COUNT(*) FROM rezervacije WHERE ime=? AND datum=? AND vreme=?", (ime, datum, pocetak))
@@ -349,7 +329,7 @@ with tab2:
         
         st.divider()
         
-        # 🔥 DEBUG: Prikaz svih podataka iz baze
+        # 🔥 DEBUG
         st.subheader("🔍 DEBUG - Svi podaci iz baze")
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
