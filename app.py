@@ -3,14 +3,12 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 
-# ---------- KONFIGURACIJA ----------
 RADNO_VREME = [(9,0), (20,0)]
 INTERVAL_MIN = 15
 BROJ_DANA = 7
 PAUZA_POCETAK = 12
 PAUZA_KRAJ = 13
 
-# ---------- INICIJALIZACIJA BAZE ----------
 def init_db():
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
@@ -49,7 +47,6 @@ def init_db():
 
 init_db()
 
-# ---------- POMOĆNE FUNKCIJE ----------
 def formatiraj_datum(datum_str):
     dan = datetime.strptime(datum_str, "%Y-%m-%d")
     dani_u_nedelji = ["Ponedeljak", "Utorak", "Sreda", "Četvrtak", "Petak", "Subota", "Nedelja"]
@@ -77,7 +74,6 @@ def generisi_slotove_za_dan(datum_str):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    # 🔥 BRIŠEMO SAMO PRAZNE SLOTOVE (ne i zauzete)
     c.execute("DELETE FROM rezervacije WHERE datum=? AND ime IS NULL", (datum_str,))
     
     sat_start, min_start = RADNO_VREME[0]
@@ -110,39 +106,11 @@ def osvezi_termine():
         generisi_slotove_za_dan(d)
     return True
 
-def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
-    broj_slotova = trajanje // INTERVAL_MIN
-    if trajanje % INTERVAL_MIN != 0:
-        broj_slotova += 1
-    
-    conn = sqlite3.connect('termini.db')
-    c = conn.cursor()
-    
-    c.execute("""
-        SELECT vreme FROM rezervacije 
-        WHERE datum=? AND vreme >= ? AND ime IS NULL 
-        ORDER BY vreme ASC
-    """, (datum, pocetak))
-    
-    slobodni = [row[0] for row in c.fetchall()]
-    conn.close()
-    
-    if len(slobodni) < broj_slotova:
-        return False
-    
-    for i in range(broj_slotova - 1):
-        t1 = datetime.strptime(slobodni[i], "%H:%M")
-        t2 = datetime.strptime(slobodni[i+1], "%H:%M")
-        if (t2 - t1).seconds // 60 != INTERVAL_MIN:
-            return False
-    
-    return True
-
 def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    # 🔥 DIREKTAN INSERT - bez brisanja slotova
+    # 🔥 DIREKTAN INSERT
     c.execute("""
         INSERT INTO rezervacije (usluga, datum, vreme, ime, telefon, cena, naplaceno, datum_naplate)
         VALUES (?, ?, ?, ?, ?, ?, 0, ?)
@@ -267,31 +235,25 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
-            if usluga_trajanje > 0:
-                kliknuto_vreme = prikazi_tabelu_termina(datum, usluga_trajanje)
-            else:
-                st.info("📌 Izaberite uslugu da biste videli slobodne termine.")
-                kliknuto_vreme = None
+            # 🔥 PRIKAZUJEMO TABELU BEZ PROVERE
+            kliknuto_vreme = prikazi_tabelu_termina(datum, usluga_trajanje)
             
             if kliknuto_vreme:
                 if ime and tel:
-                    if dovoljno_slobodnih_slotova(datum, kliknuto_vreme, usluga_trajanje):
-                        if rezervisi_blok(datum, kliknuto_vreme, usluga_trajanje, ime, tel, usluga_ime, usluga_cena):
-                            st.session_state['booking_success'] = True
-                            st.session_state['booking_details'] = {
-                                'usluga': usluga_ime,
-                                'datum': datum,
-                                'vreme': kliknuto_vreme,
-                                'trajanje': usluga_trajanje,
-                                'cena': usluga_cena,
-                                'ime': ime
-                            }
-                            st.rerun()
-                        else:
-                            st.error("❌ Greška pri rezervaciji. Pokušajte ponovo.")
-                            st.rerun()
+                    # 🔥 DIREKTNA REZERVACIJA - bez provere
+                    if rezervisi_blok(datum, kliknuto_vreme, usluga_trajanje, ime, tel, usluga_ime, usluga_cena):
+                        st.session_state['booking_success'] = True
+                        st.session_state['booking_details'] = {
+                            'usluga': usluga_ime,
+                            'datum': datum,
+                            'vreme': kliknuto_vreme,
+                            'trajanje': usluga_trajanje,
+                            'cena': usluga_cena,
+                            'ime': ime
+                        }
+                        st.rerun()
                     else:
-                        st.error("❌ Nema dovoljno slobodnih termina za ovu uslugu u izabrano vreme.")
+                        st.error("❌ Greška pri rezervaciji. Pokušajte ponovo.")
                         st.rerun()
                 else:
                     st.warning("⚠️ Popunite ime i telefon pre nego što kliknete na termin.")
