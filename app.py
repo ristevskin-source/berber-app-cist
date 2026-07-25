@@ -14,9 +14,9 @@ st.markdown("""
         background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%);
     }
     
-    /* NASLOVI - BELI */
+    /* NASLOVI - ZLATNI */
     h1, h2, h3, .stSubheader {
-        color: white !important;
+        color: #d4af37 !important;
     }
     
     /* KARTICA - NEBO PLAVA, ZLATNI OKVIR */
@@ -361,13 +361,13 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# NASLOV - KOD KUBANCA
+# NASLOV - KOD KUBANCA (ZLATNI)
 st.markdown("""
     <div style="text-align: center; padding: 10px 0 0 0; margin: 0;">
-        <h1 style="color: #d4af37; font-size: 3.5em; font-weight: 900; letter-spacing: 5px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 0; padding: 0;">
+        <h1 style="color: #d4af37 !important; font-size: 3.5em; font-weight: 900; letter-spacing: 5px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 0; padding: 0;">
             KOD KUBANCA
         </h1>
-        <h3 style="color: #d4af37; font-weight: 300; letter-spacing: 3px; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); margin: 0; padding: 0;">
+        <h3 style="color: #d4af37 !important; font-weight: 300; letter-spacing: 3px; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); margin: 0; padding: 0;">
             Zakazivanje
         </h3>
     </div>
@@ -413,7 +413,7 @@ with tab1:
             # ---------- KARTICA ZA UNOS PODATAKA ----------
             with st.container():
                 st.markdown("""
-                <div class="kartica-klijent">
+                <div style="background-color: #87CEEB; padding: 25px; border-radius: 15px; border: 4px solid #d4af37; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                 """, unsafe_allow_html=True)
                 
                 ime = st.text_input("Ime i prezime *")
