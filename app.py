@@ -10,65 +10,13 @@ st.markdown("""
 <style>
     /* POZADINA CELE STRANICE - ČOKOLADA */
     .stApp {
-        background-color: #4a2c1a;
-        background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%);
+        background-color: #4a2c1a !important;
+        background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%) !important;
     }
     
     /* NASLOVI - ZLATNI */
     h1, h2, h3, .stSubheader {
         color: #d4af37 !important;
-    }
-    
-    /* KARTICA - NEBO PLAVA, ZLATNI OKVIR */
-    .kartica-klijent {
-        background-color: #87CEEB !important;
-        padding: 25px !important;
-        border-radius: 15px !important;
-        border: 4px solid #d4af37 !important;
-        margin-bottom: 30px !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
-    }
-    
-    /* LABEL-E (NASLOVI POLJA) - CRNI */
-    .stTextInput > div > label, 
-    .stSelectbox > div > label,
-    .stTextInput > label,
-    .stSelectbox > label {
-        color: black !important;
-        font-weight: bold !important;
-    }
-    
-    /* POLJA ZA UNOS - BRAON POZADINA, BELA SLOVA */
-    .stTextInput > div > div > input {
-        color: white !important;
-        background-color: #4a2c1a !important;
-        border: 2px solid #d4af37 !important;
-        border-radius: 8px !important;
-    }
-    
-    /* SELECT BOX (PADAJUĆI MENI) - BRAON, BELA SLOVA */
-    .stSelectbox > div > div > div {
-        color: white !important;
-        background-color: #4a2c1a !important;
-        border: 2px solid #d4af37 !important;
-        border-radius: 8px !important;
-    }
-    
-    .stSelectbox > div > div > div > div {
-        background-color: #4a2c1a !important;
-        color: white !important;
-    }
-    
-    /* OPCIJE U PADAJUĆEM MENIJU */
-    div[data-baseweb="select"] ul {
-        background-color: #4a2c1a !important;
-    }
-    div[data-baseweb="select"] ul li {
-        color: white !important;
-    }
-    div[data-baseweb="select"] ul li:hover {
-        background-color: #d4af37 !important;
-        color: #4a2c1a !important;
     }
     
     /* METRIKA U ADMINU */
@@ -83,12 +31,6 @@ st.markdown("""
     }
     .stMetric > div > div > div {
         color: #d4af37 !important;
-    }
-    
-    /* SLOTOVI - ZLATNA POZADINA */
-    div[data-testid="column"] > div > div > div > div {
-        background-color: #d4af37 !important;
-        border-color: #b8960a !important;
     }
     
     /* DUGME ZA SLOTOVE - ZLATNO */
@@ -210,8 +152,6 @@ def osvezi_termine():
     return True
 
 def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
-    """Proverava da li ima dovoljno SLOBODNIH i NEPREKLAPAJUCIH slotova"""
-    
     broj_slotova = trajanje // INTERVAL_MIN
     if trajanje % INTERVAL_MIN != 0:
         broj_slotova += 1
@@ -300,7 +240,6 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     return count > 0
 
 def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
-    """Prikazuje tabelu slotova - za klijenta ili admina"""
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
@@ -410,26 +349,66 @@ with tab1:
         if datumi_raw and usluge:
             osvezi_termine()
             
-            # ---------- KARTICA ZA UNOS PODATAKA ----------
-            with st.container():
-                st.markdown("""
-                <div style="background-color: #87CEEB; padding: 25px; border-radius: 15px; border: 4px solid #d4af37; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-                """, unsafe_allow_html=True)
-                
-                ime = st.text_input("Ime i prezime *")
-                tel = st.text_input("Telefon *")
-                
-                usluga_opcije = [f"{u[0]} ({u[2]} min, {u[1]} din)" for u in usluge]
-                izabrana = st.selectbox("Usluga", usluga_opcije)
-                
-                idx = usluga_opcije.index(izabrana) if izabrana in usluga_opcije else 0
-                usluga_ime = usluge[idx][0]
-                usluga_cena = usluge[idx][1]
-                usluga_trajanje = usluge[idx][2]
-                
-                datum = st.selectbox("Datum", datumi_raw, format_func=formatiraj_datum)
-                
-                st.markdown("</div>", unsafe_allow_html=True)
+            # ---------- KARTICA ZA UNOS PODATAKA - NEBO PLAVA SA ZLATNIM OKVIROM ----------
+            st.markdown("""
+            <div style="background-color: #87CEEB; padding: 25px; border-radius: 15px; border: 4px solid #d4af37; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+            """, unsafe_allow_html=True)
+            
+            # SVA 4 POLJA SA DIREKTNIM STILOVIMA
+            st.markdown("""
+            <style>
+                /* POLJA ZA UNOS - BRAON POZADINA, BELA SLOVA */
+                .stTextInput > div > div > input {
+                    color: white !important;
+                    background-color: #4a2c1a !important;
+                    border: 2px solid #d4af37 !important;
+                    border-radius: 8px !important;
+                }
+                .stTextInput > div > label {
+                    color: black !important;
+                    font-weight: bold !important;
+                }
+                .stSelectbox > div > div > div {
+                    color: white !important;
+                    background-color: #4a2c1a !important;
+                    border: 2px solid #d4af37 !important;
+                    border-radius: 8px !important;
+                }
+                .stSelectbox > div > label {
+                    color: black !important;
+                    font-weight: bold !important;
+                }
+                .stSelectbox > div > div > div > div {
+                    background-color: #4a2c1a !important;
+                    color: white !important;
+                }
+                div[data-baseweb="select"] ul {
+                    background-color: #4a2c1a !important;
+                }
+                div[data-baseweb="select"] ul li {
+                    color: white !important;
+                }
+                div[data-baseweb="select"] ul li:hover {
+                    background-color: #d4af37 !important;
+                    color: #4a2c1a !important;
+                }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            ime = st.text_input("Ime i prezime *")
+            tel = st.text_input("Telefon *")
+            
+            usluga_opcije = [f"{u[0]} ({u[2]} min, {u[1]} din)" for u in usluge]
+            izabrana = st.selectbox("Usluga", usluga_opcije)
+            
+            idx = usluga_opcije.index(izabrana) if izabrana in usluga_opcije else 0
+            usluga_ime = usluge[idx][0]
+            usluga_cena = usluge[idx][1]
+            usluga_trajanje = usluge[idx][2]
+            
+            datum = st.selectbox("Datum", datumi_raw, format_func=formatiraj_datum)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
             
             # ---------- TABELA TERMINA ----------
             st.subheader("📋 Slobodni termini")
