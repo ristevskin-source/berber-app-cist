@@ -107,67 +107,67 @@ def osvezi_termine():
     return True
 
 def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
+    """Proverava da li ima dovoljno SLOBODNIH i NEPREKLAPAJUCIH slotova"""
+    
+    # Koliko slotova treba
     broj_slotova = trajanje // INTERVAL_MIN
     if trajanje % INTERVAL_MIN != 0:
         broj_slotova += 1
     
+    # Izračunaj krajnje vreme
+    pocetak_dt = datetime.strptime(pocetak, "%H:%M")
+    kraj_dt = pocetak_dt + timedelta(minutes=trajanje)
+    kraj = kraj_dt.strftime("%H:%M")
+    
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
+    
+    # 1. Proveri sve ZAUZETE termine na taj dan
+    c.execute("""
+        SELECT vreme, usluga FROM rezervacije 
+        WHERE datum=? AND ime IS NOT NULL AND ime != ''
+    """, (datum,))
+    zauzeti = c.fetchall()
+    
+    # 2. Proveri da li se novi termin preklapa SA BILO KOJIM zauzetim
+    for zauzet_vreme, zauzeta_usluga in zauzeti:
+        zauzet_dt = datetime.strptime(zauzet_vreme, "%H:%M")
+        
+        # Uzmi trajanje zauzete usluge
+        c.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (zauzeta_usluga,))
+        result = c.fetchone()
+        
+        if result:
+            zauzet_trajanje = result[0]
+            zauzet_kraj_dt = zauzet_dt + timedelta(minutes=zauzet_trajanje)
+            
+            # Provera preklapanja:
+            # Novi termin se preklapa ako njegov početak ili kraj pada unutar zauzetog intervala
+            if not (kraj_dt <= zauzet_dt or pocetak_dt >= zauzet_kraj_dt):
+                conn.close()
+                return False  # IMA PREKLAPANJA!
+    
+    # 3. Proveri da li ima dovoljno SLOBODNIH slotova
     c.execute("""
         SELECT vreme FROM rezervacije 
-        WHERE datum=? AND vreme >= ? AND ime IS NULL 
+        WHERE datum=? AND vreme >= ? AND vreme < ? AND ime IS NULL 
         ORDER BY vreme ASC
-    """, (datum, pocetak))
+    """, (datum, pocetak, kraj))
     slobodni = [row[0] for row in c.fetchall()]
     conn.close()
     
+    # Mora da ima tačno onoliko slotova koliko treba
     if len(slobodni) < broj_slotova:
         return False
     
+    # Proveri da li su slotovi uzastopni
     for i in range(broj_slotova - 1):
         t1 = datetime.strptime(slobodni[i], "%H:%M")
         t2 = datetime.strptime(slobodni[i+1], "%H:%M")
         if (t2 - t1).seconds // 60 != INTERVAL_MIN:
             return False
+    
     return True
-
-def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
-    conn = sqlite3.connect('termini.db')
-    c = conn.cursor()
-    
-    broj_slotova = trajanje // INTERVAL_MIN
-    if trajanje % INTERVAL_MIN != 0:
-        broj_slotova += 1
-    
-    c.execute("""
-        SELECT id FROM rezervacije 
-        WHERE datum=? AND vreme >= ? AND ime IS NULL 
-        ORDER BY vreme ASC LIMIT ?
-    """, (datum, pocetak, broj_slotova))
-    
-    ids = [row[0] for row in c.fetchall()]
-    
-    if len(ids) < broj_slotova:
-        conn.close()
-        return False
-    
-    for id in ids:
-        c.execute("""
-            UPDATE rezervacije 
-            SET ime=?, telefon=?, usluga=?, cena=?, naplaceno=0 
-            WHERE id=?
-        """, (ime, telefon, usluga, cena, id))
-    
-    conn.commit()
-    conn.close()
-    
-    conn2 = sqlite3.connect('termini.db')
-    c2 = conn2.cursor()
-    c2.execute("SELECT COUNT(*) FROM rezervacije WHERE ime=? AND datum=? AND vreme=?", (ime, datum, pocetak))
-    count = c2.fetchone()[0]
-    conn2.close()
-    
-    return count > 0
 
 def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     """Prikazuje tabelu slotova - za klijenta ili admina"""
