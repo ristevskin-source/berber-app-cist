@@ -290,21 +290,6 @@ with tab2:
         
         st.divider()
         
-        # 🔥 DEBUG
-        st.subheader("🔍 DEBUG - Svi podaci iz baze")
-        conn = sqlite3.connect('termini.db', check_same_thread=False, isolation_level=None)
-        c = conn.cursor()
-        c.execute("SELECT * FROM rezervacije ORDER BY datum, vreme")
-        svi = c.fetchall()
-        if svi:
-            st.write("📋 Svi redovi u bazi:")
-            for red in svi:
-                st.write(red)
-        else:
-            st.info("📭 Baza je prazna.")
-        conn.close()
-        st.divider()
-        
         conn = sqlite3.connect('termini.db', check_same_thread=False, isolation_level=None)
         c = conn.cursor()
         today = datetime.now().strftime("%Y-%m-%d")
