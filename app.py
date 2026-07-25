@@ -203,8 +203,9 @@ def prikazi_tabelu_termina(datum, usluga_trajanje):
         for j, (vreme, ime_slota) in enumerate(row):
             with cols[j]:
                 if ime_slota is None or ime_slota == "":
-                    # 🔥 SVI SLOBODNI SLOTOVI SU ZELENI (BEZ PROVERE)
+                    # 🔥 SVI SLOBODNI SLOTOVI SU ZELENI
                     if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
+                        st.write(f"🔍 Kliknuo si na: {vreme}")  # DEBUG
                         kliknuto_vreme = vreme
                 else:
                     st.markdown(f"""
@@ -213,6 +214,7 @@ def prikazi_tabelu_termina(datum, usluga_trajanje):
                     </div>
                     """, unsafe_allow_html=True)
     
+    st.write(f"🔍 Vreme koje se vraća: {kliknuto_vreme}")  # DEBUG
     return kliknuto_vreme
 
 # ---------- UI ----------
