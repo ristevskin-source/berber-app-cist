@@ -169,7 +169,8 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     
     return count > 0
 
-def prikazi_tabelu_termina(datum, usluga_trajanje):
+def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
+    """Prikazuje tabelu slotova - za klijenta ili admina"""
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
@@ -203,10 +204,16 @@ def prikazi_tabelu_termina(datum, usluga_trajanje):
         for j, (vreme, ime_slota) in enumerate(row):
             with cols[j]:
                 if ime_slota is None or ime_slota == "":
-                    # 🔥 SVI SLOBODNI SLOTOVI SU ZELENI
-                    if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
-                        st.write(f"🔍 Kliknuo si na: {vreme}")  # DEBUG
-                        kliknuto_vreme = vreme
+                    # Ako je admin mod, samo prikazujemo (ne klikabilno)
+                    if mode == "admin":
+                        st.markdown(f"""
+                        <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
+                            🟢 {vreme}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
+                            kliknuto_vreme = vreme
                 else:
                     st.markdown(f"""
                     <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
@@ -214,7 +221,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje):
                     </div>
                     """, unsafe_allow_html=True)
     
-    st.write(f"🔍 Vreme koje se vraća: {kliknuto_vreme}")  # DEBUG
     return kliknuto_vreme
 
 # ---------- UI ----------
@@ -279,11 +285,10 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
-            kliknuto_vreme = prikazi_tabelu_termina(datum, usluga_trajanje)
+            kliknuto_vreme = prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent")
             
             if kliknuto_vreme:
                 if ime and tel:
-                    # 🔥 PROVERA TEK NAKON KLIKA
                     if dovoljno_slobodnih_slotova(datum, kliknuto_vreme, usluga_trajanje):
                         if rezervisi_blok(datum, kliknuto_vreme, usluga_trajanje, ime, tel, usluga_ime, usluga_cena):
                             st.session_state['booking_success'] = True
@@ -484,6 +489,32 @@ with tab2:
         else:
             st.info("📭 Trenutno nema zakazanih klijenata.")
         
+        # ---------- TABELA TERMINA ZA ADMINA (NOVO!) ----------
+        st.subheader("📋 Pregled termina (admin)")
+        
+        conn = sqlite3.connect('termini.db')
+        c = conn.cursor()
+        datumi_raw = generisi_datume()
+        c.execute("SELECT usluga, cena, trajanje FROM cenovnik ORDER BY trajanje ASC")
+        usluge = c.fetchall()
+        conn.close()
+        
+        if datumi_raw and usluge:
+            admin_datum = st.selectbox("Izaberite datum za pregled", datumi_raw, format_func=formatiraj_datum, key="admin_datum_pregled")
+            
+            # Prikaz tabele za admina (samo vizuelno, bez klika)
+            st.write("**Status termina:**")
+            st.markdown("""
+            <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
+                <span>🟢 <span style="color: #aaa;">Slobodan termin</span></span>
+                <span>🔴 <span style="color: #aaa;">Zauzet termin</span></span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Prikazujemo tabelu u admin modu (neklikabilno)
+            prikazi_tabelu_termina(admin_datum, 0, mode="admin")
+        
+        # ---------- UPRAVLJANJE USLUGAMA ----------
         st.subheader("📝 Upravljanje uslugama")
         
         with st.form("dodaj_uslugu"):
