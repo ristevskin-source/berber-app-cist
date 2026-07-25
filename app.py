@@ -413,10 +413,16 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
+            # Proveri da li su sva polja popunjena
+            sva_polja_popunjena = ime and tel and ime.strip() and tel.strip()
+            
+            if not sva_polja_popunjena:
+                st.warning("⚠️ Popunite sva polja (Ime, Telefon, Usluga, Datum) pre nego što kliknete na termin.")
+            
             kliknuto_vreme = prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent")
             
             if kliknuto_vreme:
-                if ime and tel:
+                if sva_polja_popunjena:
                     if dovoljno_slobodnih_slotova(datum, kliknuto_vreme, usluga_trajanje):
                         if rezervisi_blok(datum, kliknuto_vreme, usluga_trajanje, ime, tel, usluga_ime, usluga_cena):
                             st.session_state['booking_success'] = True
@@ -436,10 +442,10 @@ with tab1:
                         st.error("❌ Nema dovoljno slobodnih termina za ovu uslugu u izabrano vreme.")
                         st.rerun()
                 else:
-                    st.warning("⚠️ Popunite ime i telefon pre nego što kliknete na termin.")
+                    st.error("❌ Popunite sva polja pre nego što kliknete na termin.")
+                    st.rerun()
         else:
             st.error("❌ Baza je prazna.")
-
 with tab2:
     if "admin" not in st.session_state:
         st.session_state.admin = False
