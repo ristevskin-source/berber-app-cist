@@ -3,6 +3,8 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 
+st.set_page_config(page_title="💈 Berberski salon - Zakazivanje", layout="centered")
+
 RADNO_VREME = [(9,0), (20,0)]
 INTERVAL_MIN = 15
 BROJ_DANA = 7
@@ -169,6 +171,44 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     
     return True
 
+def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
+    conn = sqlite3.connect('termini.db')
+    c = conn.cursor()
+    
+    broj_slotova = trajanje // INTERVAL_MIN
+    if trajanje % INTERVAL_MIN != 0:
+        broj_slotova += 1
+    
+    c.execute("""
+        SELECT id FROM rezervacije 
+        WHERE datum=? AND vreme >= ? AND ime IS NULL 
+        ORDER BY vreme ASC LIMIT ?
+    """, (datum, pocetak, broj_slotova))
+    
+    ids = [row[0] for row in c.fetchall()]
+    
+    if len(ids) < broj_slotova:
+        conn.close()
+        return False
+    
+    for id in ids:
+        c.execute("""
+            UPDATE rezervacije 
+            SET ime=?, telefon=?, usluga=?, cena=?, naplaceno=0 
+            WHERE id=?
+        """, (ime, telefon, usluga, cena, id))
+    
+    conn.commit()
+    conn.close()
+    
+    conn2 = sqlite3.connect('termini.db')
+    c2 = conn2.cursor()
+    c2.execute("SELECT COUNT(*) FROM rezervacije WHERE ime=? AND datum=? AND vreme=?", (ime, datum, pocetak))
+    count = c2.fetchone()[0]
+    conn2.close()
+    
+    return count > 0
+
 def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     """Prikazuje tabelu slotova - za klijenta ili admina"""
     conn = sqlite3.connect('termini.db')
@@ -204,7 +244,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
         for j, (vreme, ime_slota) in enumerate(row):
             with cols[j]:
                 if ime_slota is None or ime_slota == "":
-                    # Ako je admin mod, samo prikazujemo (ne klikabilno)
                     if mode == "admin":
                         st.markdown(f"""
                         <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
@@ -224,8 +263,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     return kliknuto_vreme
 
 # ---------- UI ----------
-st.set_page_config(page_title="💈 Zakazivanje", layout="centered")
-
 st.title("💈 Berberski salon - Zakazivanje")
 
 tab1, tab2 = st.tabs(["📅 Zakazivanje", "🔑 Admin Panel"])
@@ -489,7 +526,7 @@ with tab2:
         else:
             st.info("📭 Trenutno nema zakazanih klijenata.")
         
-        # ---------- TABELA TERMINA ZA ADMINA (NOVO!) ----------
+        # ---------- TABELA TERMINA ZA ADMINA ----------
         st.subheader("📋 Pregled termina (admin)")
         
         conn = sqlite3.connect('termini.db')
@@ -502,7 +539,6 @@ with tab2:
         if datumi_raw and usluge:
             admin_datum = st.selectbox("Izaberite datum za pregled", datumi_raw, format_func=formatiraj_datum, key="admin_datum_pregled")
             
-            # Prikaz tabele za admina (samo vizuelno, bez klika)
             st.write("**Status termina:**")
             st.markdown("""
             <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
@@ -511,7 +547,6 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
             
-            # Prikazujemo tabelu u admin modu (neklikabilno)
             prikazi_tabelu_termina(admin_datum, 0, mode="admin")
         
         # ---------- UPRAVLJANJE USLUGAMA ----------
