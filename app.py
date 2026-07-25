@@ -76,7 +76,8 @@ def generisi_slotove_za_dan(datum_str):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    c.execute("DELETE FROM rezervacije WHERE datum=? AND ime IS NULL", (datum_str,))
+    # Obriši sve slotove za taj dan (i slobodne i zauzete)
+    c.execute("DELETE FROM rezervacije WHERE datum=?", (datum_str,))
     
     sat_start, min_start = RADNO_VREME[0]
     sat_kraj, min_kraj = RADNO_VREME[1]
@@ -213,42 +214,37 @@ def prikazi_timeline(datum, usluga_trajanje, mode="klijent"):
         st.warning("⏳ Nema termina za izabrani datum.")
         return None
     
-    # Kreiraj listu sa svim slotovima
-    slotovi = []
+    # Kreiraj listu sa svim slotovima - JEDINSTVENI po vremenu
+    slotovi_dict = {}
     for vreme, ime, usluga in svi_slotovi:
-        # Ako je zauzet, uzmi trajanje iz cenovnika
-        trajanje_slota = 15  # default
-        if ime and ime != "":
-            conn2 = sqlite3.connect('termini.db')
-            c2 = conn2.cursor()
-            c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
-            result = c2.fetchone()
-            conn2.close()
-            if result:
-                trajanje_slota = result[0]
-        slotovi.append({
-            'vreme': vreme,
-            'ime': ime,
-            'trajanje': trajanje_slota if ime else 15,
-            'zauzet': ime is not None and ime != ""
-        })
+        # Ako već postoji isti slot, preskoči (uzmi prvi)
+        if vreme not in slotovi_dict:
+            trajanje_slota = 15  # default
+            if ime and ime != "":
+                conn2 = sqlite3.connect('termini.db')
+                c2 = conn2.cursor()
+                c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
+                result = c2.fetchone()
+                conn2.close()
+                if result:
+                    trajanje_slota = result[0]
+            slotovi_dict[vreme] = {
+                'vreme': vreme,
+                'ime': ime,
+                'trajanje': trajanje_slota if ime else 15,
+                'zauzet': ime is not None and ime != ""
+            }
     
-    # Sortiraj po vremenu
+    slotovi = list(slotovi_dict.values())
     slotovi.sort(key=lambda x: x['vreme'])
-    
-    # Pronađi ukupan vremenski opseg
-    prvi = datetime.strptime(slotovi[0]['vreme'], "%H:%M")
-    poslednji = datetime.strptime(slotovi[-1]['vreme'], "%H:%M")
-    ukupno_minuta = int((poslednji - prvi).seconds / 60) + 15
     
     # HTML za timeline
     html = f"""
     <div style="background-color: #2a2a2a; padding: 20px; border-radius: 10px; margin: 10px 0; overflow-x: auto;">
-        <div style="display: flex; gap: 2px; min-height: 80px; align-items: stretch;">
+        <div style="display: flex; gap: 2px; min-height: 80px; align-items: stretch; flex-wrap: nowrap;">
     """
     
     for slot in slotovi:
-        vreme_dt = datetime.strptime(slot['vreme'], "%H:%M")
         if slot['zauzet']:
             # Zauzet blok - crven
             trajanje = slot['trajanje']
@@ -274,7 +270,7 @@ def prikazi_timeline(datum, usluga_trajanje, mode="klijent"):
             </div>
             """
         else:
-            # Slobodan blok - zelen (klikabilan)
+            # Slobodan blok - zelen
             html += f"""
             <div style="background-color: #2a7a2a; 
                         border: 2px solid #4ac24a; 
@@ -291,8 +287,7 @@ def prikazi_timeline(datum, usluga_trajanje, mode="klijent"):
                         align-items: center;
                         cursor: pointer;
                         margin: 2px 0;
-                        transition: all 0.2s;
-                        hover:background-color: #3a9a3a;">
+                        transition: all 0.2s;">
                 🟢 {slot['vreme']}
             </div>
             """
@@ -725,28 +720,4 @@ with tab2:
         
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
-        c.execute("SELECT usluga, cena, trajanje FROM cenovnik ORDER BY usluga")
-        sve_usluge = c.fetchall()
-        conn.close()
-        
-        if sve_usluge:
-            for usluga, cena, trajanje in sve_usluge:
-                col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-                with col1:
-                    st.write(f"**{usluga}**")
-                with col2:
-                    st.write(f"{cena} din")
-                with col3:
-                    novo_trajanje = st.number_input(f"Trajanje (min)", value=trajanje, step=15, key=f"trajanje_{usluga}")
-                with col4:
-                    nova_cena = st.number_input(f"Nova cena", value=cena, step=100, key=f"cena_{usluga}")
-                    if st.button(f"💾 Sačuvaj", key=f"save_{usluga}"):
-                        conn = sqlite3.connect('termini.db')
-                        c = conn.cursor()
-                        c.execute("UPDATE cenovnik SET cena=?, trajanje=? WHERE usluga=?", (nova_cena, novo_trajanje, usluga))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"✅ Usluga {usluga} ažurirana!")
-                        st.rerun()
-        else:
-            st.info("📭 Trenutno nema definisanih usluga.")
+        c.execute("SELECT usluga, cena, trajanje FROM cenov
