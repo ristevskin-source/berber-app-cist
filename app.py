@@ -196,12 +196,13 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     
     return count > 0
 
-def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
+def prikazi_timeline(datum, usluga_trajanje, mode="klijent"):
+    """Prikazuje horizontalnu vremensku liniju sa zauzetim i slobodnim blokovima"""
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
     c.execute("""
-        SELECT vreme, ime FROM rezervacije 
+        SELECT vreme, ime, usluga FROM rezervacije 
         WHERE datum=? 
         ORDER BY vreme ASC
     """, (datum,))
@@ -209,42 +210,117 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     conn.close()
     
     if not svi_slotovi:
-        st.warning("⏳ Nema slobodnih termina za izabrani datum.")
+        st.warning("⏳ Nema termina za izabrani datum.")
         return None
     
-    jedinstveni = {}
-    for vreme, ime in svi_slotovi:
-        if vreme not in jedinstveni:
-            jedinstveni[vreme] = ime
+    # Kreiraj listu sa svim slotovima
+    slotovi = []
+    for vreme, ime, usluga in svi_slotovi:
+        # Ako je zauzet, uzmi trajanje iz cenovnika
+        trajanje_slota = 15  # default
+        if ime and ime != "":
+            conn2 = sqlite3.connect('termini.db')
+            c2 = conn2.cursor()
+            c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
+            result = c2.fetchone()
+            conn2.close()
+            if result:
+                trajanje_slota = result[0]
+        slotovi.append({
+            'vreme': vreme,
+            'ime': ime,
+            'trajanje': trajanje_slota if ime else 15,
+            'zauzet': ime is not None and ime != ""
+        })
     
-    svi_slotovi = list(jedinstveni.items())
-    svi_slotovi.sort()
+    # Sortiraj po vremenu
+    slotovi.sort(key=lambda x: x['vreme'])
     
-    cols_per_row = 4
-    rows = [svi_slotovi[i:i+cols_per_row] for i in range(0, len(svi_slotovi), cols_per_row)]
+    # Pronađi ukupan vremenski opseg
+    prvi = datetime.strptime(slotovi[0]['vreme'], "%H:%M")
+    poslednji = datetime.strptime(slotovi[-1]['vreme'], "%H:%M")
+    ukupno_minuta = int((poslednji - prvi).seconds / 60) + 15
     
+    # HTML za timeline
+    html = f"""
+    <div style="background-color: #2a2a2a; padding: 20px; border-radius: 10px; margin: 10px 0; overflow-x: auto;">
+        <div style="display: flex; gap: 2px; min-height: 80px; align-items: stretch;">
+    """
+    
+    for slot in slotovi:
+        vreme_dt = datetime.strptime(slot['vreme'], "%H:%M")
+        if slot['zauzet']:
+            # Zauzet blok - crven
+            trajanje = slot['trajanje']
+            width = trajanje / 15 * 20  # 20px po slotu
+            html += f"""
+            <div style="background-color: #7a2a2a; 
+                        border: 2px solid #aa4a4a; 
+                        border-radius: 6px; 
+                        padding: 8px 4px; 
+                        min-width: {width}px; 
+                        flex: 0 0 {width}px;
+                        color: #aaaaaa; 
+                        text-align: center; 
+                        font-size: 12px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                        cursor: not-allowed;
+                        margin: 2px 0;">
+                🔴 {slot['vreme']}
+                <span style="font-size: 10px; opacity: 0.7;">zauzeto</span>
+            </div>
+            """
+        else:
+            # Slobodan blok - zelen (klikabilan)
+            html += f"""
+            <div style="background-color: #2a7a2a; 
+                        border: 2px solid #4ac24a; 
+                        border-radius: 6px; 
+                        padding: 8px 4px; 
+                        min-width: 20px; 
+                        flex: 0 0 20px;
+                        color: white; 
+                        text-align: center; 
+                        font-size: 12px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                        cursor: pointer;
+                        margin: 2px 0;
+                        transition: all 0.2s;
+                        hover:background-color: #3a9a3a;">
+                🟢 {slot['vreme']}
+            </div>
+            """
+    
+    html += """
+        </div>
+    </div>
+    """
+    
+    st.markdown(html, unsafe_allow_html=True)
+    
+    # Prikaz klikabilnih dugmića za slobodne slotove
+    st.markdown("### 🎯 Izaberite termin:")
+    
+    slobodni_slotovi = [s for s in slotovi if not s['zauzet']]
+    
+    if not slobodni_slotovi:
+        st.warning("Nema slobodnih termina za ovaj dan.")
+        return None
+    
+    cols = st.columns(min(len(slobodni_slotovi), 4))
     kliknuto_vreme = None
     
-    for row in rows:
-        cols = st.columns(cols_per_row)
-        for j, (vreme, ime_slota) in enumerate(row):
-            with cols[j]:
-                if ime_slota is None or ime_slota == "":
-                    if mode == "admin":
-                        st.markdown(f"""
-                        <div style="background-color:#d4af37; color:#4a2c1a; border:2px solid #b8960a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
-                            🟢 {vreme}
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
-                            kliknuto_vreme = vreme
-                else:
-                    st.markdown(f"""
-                    <div style="background-color:#d4af37; color:#4a2c1a; border:2px solid #b8960a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
-                        🔴 {vreme}
-                    </div>
-                    """, unsafe_allow_html=True)
+    for i, slot in enumerate(slobodni_slotovi):
+        col_idx = i % 4
+        with cols[col_idx]:
+            if st.button(f"🟢 {slot['vreme']}", key=f"timeline_{datum}_{slot['vreme']}", use_container_width=True):
+                kliknuto_vreme = slot['vreme']
     
     return kliknuto_vreme
 
@@ -256,7 +332,6 @@ st.markdown("""
         background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%) !important;
     }
     
-    /* METRIKA U ADMINU - PLAVA POZADINA, CRNI TEKST */
     .stMetric > div {
         background-color: #87CEEB !important;
         border-radius: 10px !important;
@@ -394,16 +469,16 @@ with tab1:
             
             datum = st.selectbox("Datum", datumi_raw, format_func=formatiraj_datum)
             
-            st.subheader("📋 Slobodni termini")
+            st.subheader("📋 Vremenska linija")
             
             st.markdown("""
             <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
-                <span>🟢 <span style="color: #d0d0d0;">Slobodan termin</span></span>
-                <span>🔴 <span style="color: #d0d0d0;">Zauzet termin</span></span>
+                <span>🟢 <span style="color: #aaa;">Slobodan termin</span></span>
+                <span>🔴 <span style="color: #aaa;">Zauzet termin</span></span>
             </div>
             """, unsafe_allow_html=True)
             
-            kliknuto_vreme = prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent")
+            kliknuto_vreme = prikazi_timeline(datum, usluga_trajanje, mode="klijent")
             
             if kliknuto_vreme:
                 if ime and tel:
@@ -627,7 +702,7 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
             
-            prikazi_tabelu_termina(admin_datum, 0, mode="admin")
+            prikazi_timeline(admin_datum, 0, mode="admin")
         
         st.subheader("📝 Upravljanje uslugama")
         
