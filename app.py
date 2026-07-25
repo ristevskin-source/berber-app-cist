@@ -212,12 +212,10 @@ def osvezi_termine():
 def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     """Proverava da li ima dovoljno SLOBODNIH i NEPREKLAPAJUCIH slotova"""
     
-    # Koliko slotova treba
     broj_slotova = trajanje // INTERVAL_MIN
     if trajanje % INTERVAL_MIN != 0:
         broj_slotova += 1
     
-    # Izračunaj krajnje vreme
     pocetak_dt = datetime.strptime(pocetak, "%H:%M")
     kraj_dt = pocetak_dt + timedelta(minutes=trajanje)
     kraj = kraj_dt.strftime("%H:%M")
@@ -225,18 +223,14 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    # 1. Proveri sve ZAUZETE termine na taj dan
     c.execute("""
         SELECT vreme, usluga FROM rezervacije 
         WHERE datum=? AND ime IS NOT NULL AND ime != ''
     """, (datum,))
     zauzeti = c.fetchall()
     
-    # 2. Proveri da li se novi termin preklapa SA BILO KOJIM zauzetim
     for zauzet_vreme, zauzeta_usluga in zauzeti:
         zauzet_dt = datetime.strptime(zauzet_vreme, "%H:%M")
-        
-        # Uzmi trajanje zauzete usluge
         c.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (zauzeta_usluga,))
         result = c.fetchone()
         
@@ -244,13 +238,10 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
             zauzet_trajanje = result[0]
             zauzet_kraj_dt = zauzet_dt + timedelta(minutes=zauzet_trajanje)
             
-            # Provera preklapanja:
-            # Novi termin se preklapa ako njegov početak ili kraj pada unutar zauzetog intervala
             if not (kraj_dt <= zauzet_dt or pocetak_dt >= zauzet_kraj_dt):
                 conn.close()
-                return False  # IMA PREKLAPANJA!
+                return False
     
-    # 3. Proveri da li ima dovoljno SLOBODNIH slotova
     c.execute("""
         SELECT vreme FROM rezervacije 
         WHERE datum=? AND vreme >= ? AND vreme < ? AND ime IS NULL 
@@ -259,11 +250,9 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     slobodni = [row[0] for row in c.fetchall()]
     conn.close()
     
-    # Mora da ima tačno onoliko slotova koliko treba
     if len(slobodni) < broj_slotova:
         return False
     
-    # Proveri da li su slotovi uzastopni
     for i in range(broj_slotova - 1):
         t1 = datetime.strptime(slobodni[i], "%H:%M")
         t2 = datetime.strptime(slobodni[i+1], "%H:%M")
@@ -364,7 +353,27 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     return kliknuto_vreme
 
 # ---------- UI ----------
-st.title("💈 Berberski salon - Zakazivanje")
+# LOGO - PUN ŠIRINA
+st.markdown("""
+    <div style="width: 100%; margin-bottom: 0; padding: 0;">
+        <img src="https://raw.githubusercontent.com/ristevskin-source/berber-app-cist/main/IMG-c75b1bbded411581450ad9e3374dbc68-V(1).jpg" 
+             style="width: 100%; height: auto; display: block; border-radius: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+    </div>
+""", unsafe_allow_html=True)
+
+# NASLOV - KOD KUBANCA
+st.markdown("""
+    <div style="text-align: center; padding: 10px 0 0 0; margin: 0;">
+        <h1 style="color: #d4af37; font-size: 3.5em; font-weight: 900; letter-spacing: 5px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 0; padding: 0;">
+            KOD KUBANCA
+        </h1>
+        <h3 style="color: #d4af37; font-weight: 300; letter-spacing: 3px; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); margin: 0; padding: 0;">
+            Zakazivanje
+        </h3>
+    </div>
+""", unsafe_allow_html=True)
+
+st.divider()
 
 tab1, tab2 = st.tabs(["📅 Zakazivanje", "🔑 Admin Panel"])
 
@@ -400,14 +409,6 @@ with tab1:
         
         if datumi_raw and usluge:
             osvezi_termine()
-            
-            # ---------- LOGO ----------
-            st.markdown("""
-                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                    <img src="https://raw.githubusercontent.com/ristevskin-source/berber-app-cist/main/IMG-c75b1bbded411581450ad9e3374dbc68-V(1).jpg" 
-                         style="max-width: 200px; width: 100%; height: auto; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-                </div>
-            """, unsafe_allow_html=True)
             
             # ---------- KARTICA ZA UNOS PODATAKA ----------
             with st.container():
