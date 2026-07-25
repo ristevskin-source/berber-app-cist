@@ -5,6 +5,107 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="💈 Berberski salon - Zakazivanje", layout="centered")
 
+# ---------- STILOVI ZA CELU STRANU ----------
+st.markdown("""
+<style>
+    /* POZADINA CELE STRANICE - ČOKOLADA */
+    .stApp {
+        background-color: #4a2c1a;
+        background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%);
+    }
+    
+    /* NASLOVI - BELI */
+    h1, h2, h3, .stSubheader {
+        color: white !important;
+    }
+    
+    /* KARTICA - NEBO PLAVA, ZLATNI OKVIR */
+    .kartica-klijent {
+        background-color: #87CEEB !important;
+        padding: 25px !important;
+        border-radius: 15px !important;
+        border: 4px solid #d4af37 !important;
+        margin-bottom: 30px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+    }
+    
+    /* LABEL-E (NASLOVI POLJA) - CRNI */
+    .stTextInput > div > label, 
+    .stSelectbox > div > label,
+    .stTextInput > label,
+    .stSelectbox > label {
+        color: black !important;
+        font-weight: bold !important;
+    }
+    
+    /* POLJA ZA UNOS - BRAON POZADINA, BELA SLOVA */
+    .stTextInput > div > div > input {
+        color: white !important;
+        background-color: #4a2c1a !important;
+        border: 2px solid #d4af37 !important;
+        border-radius: 8px !important;
+    }
+    
+    /* SELECT BOX (PADAJUĆI MENI) - BRAON, BELA SLOVA */
+    .stSelectbox > div > div > div {
+        color: white !important;
+        background-color: #4a2c1a !important;
+        border: 2px solid #d4af37 !important;
+        border-radius: 8px !important;
+    }
+    
+    .stSelectbox > div > div > div > div {
+        background-color: #4a2c1a !important;
+        color: white !important;
+    }
+    
+    /* OPCIJE U PADAJUĆEM MENIJU */
+    div[data-baseweb="select"] ul {
+        background-color: #4a2c1a !important;
+    }
+    div[data-baseweb="select"] ul li {
+        color: white !important;
+    }
+    div[data-baseweb="select"] ul li:hover {
+        background-color: #d4af37 !important;
+        color: #4a2c1a !important;
+    }
+    
+    /* METRIKA U ADMINU */
+    .stMetric > div {
+        background-color: #87CEEB !important;
+        border-radius: 10px !important;
+        padding: 10px !important;
+        border: 2px solid #d4af37 !important;
+    }
+    .stMetric > div > div {
+        color: black !important;
+    }
+    .stMetric > div > div > div {
+        color: #d4af37 !important;
+    }
+    
+    /* SLOTOVI - ZLATNA POZADINA */
+    div[data-testid="column"] > div > div > div > div {
+        background-color: #d4af37 !important;
+        border-color: #b8960a !important;
+    }
+    
+    /* DUGME ZA SLOTOVE - ZLATNO */
+    .stButton > button {
+        background-color: #d4af37 !important;
+        color: #4a2c1a !important;
+        font-weight: bold !important;
+        border: 2px solid #b8960a !important;
+        border-radius: 8px !important;
+    }
+    .stButton > button:hover {
+        background-color: #e8c84a !important;
+        border-color: #d4af37 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 RADNO_VREME = [(9,0), (20,0)]
 INTERVAL_MIN = 15
 BROJ_DANA = 7
@@ -246,7 +347,7 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                 if ime_slota is None or ime_slota == "":
                     if mode == "admin":
                         st.markdown(f"""
-                        <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
+                        <div style="background-color:#d4af37; color:#4a2c1a; border:2px solid #b8960a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
                             🟢 {vreme}
                         </div>
                         """, unsafe_allow_html=True)
@@ -255,7 +356,7 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                             kliknuto_vreme = vreme
                 else:
                     st.markdown(f"""
-                    <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
+                    <div style="background-color:#d4af37; color:#4a2c1a; border:2px solid #b8960a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
                         🔴 {vreme}
                     </div>
                     """, unsafe_allow_html=True)
@@ -300,19 +401,36 @@ with tab1:
         if datumi_raw and usluge:
             osvezi_termine()
             
-            ime = st.text_input("Ime i prezime *")
-            tel = st.text_input("Telefon *")
+            # ---------- LOGO ----------
+            st.markdown("""
+                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                    <img src="https://raw.githubusercontent.com/ristevskin-source/berber-app-cist/main/IMG-c75b1bbded411581450ad9e3374dbc68-V(1).jpg" 
+                         style="max-width: 200px; width: 100%; height: auto; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                </div>
+            """, unsafe_allow_html=True)
             
-            usluga_opcije = [f"{u[0]} ({u[2]} min, {u[1]} din)" for u in usluge]
-            izabrana = st.selectbox("Usluga", usluga_opcije)
+            # ---------- KARTICA ZA UNOS PODATAKA ----------
+            with st.container():
+                st.markdown("""
+                <div class="kartica-klijent">
+                """, unsafe_allow_html=True)
+                
+                ime = st.text_input("Ime i prezime *")
+                tel = st.text_input("Telefon *")
+                
+                usluga_opcije = [f"{u[0]} ({u[2]} min, {u[1]} din)" for u in usluge]
+                izabrana = st.selectbox("Usluga", usluga_opcije)
+                
+                idx = usluga_opcije.index(izabrana) if izabrana in usluga_opcije else 0
+                usluga_ime = usluge[idx][0]
+                usluga_cena = usluge[idx][1]
+                usluga_trajanje = usluge[idx][2]
+                
+                datum = st.selectbox("Datum", datumi_raw, format_func=formatiraj_datum)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
             
-            idx = usluga_opcije.index(izabrana) if izabrana in usluga_opcije else 0
-            usluga_ime = usluge[idx][0]
-            usluga_cena = usluge[idx][1]
-            usluga_trajanje = usluge[idx][2]
-            
-            datum = st.selectbox("Datum", datumi_raw, format_func=formatiraj_datum)
-            
+            # ---------- TABELA TERMINA ----------
             st.subheader("📋 Slobodni termini")
             
             st.markdown("""
