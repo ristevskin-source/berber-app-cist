@@ -323,6 +323,17 @@ st.markdown("""
     h1, h2, h3, .stSubheader {
         color: #d4af37 !important;
     }
+    
+    /* CRNI TEKST ZA NAZIVE USLUGA U ADMIN PANELU */
+    .stWrite, .stMarkdown, .stText {
+        color: #000000 !important;
+    }
+    .stWrite p, .stMarkdown p, .stText p {
+        color: #000000 !important;
+    }
+    div[data-testid="stColumn"] p {
+        color: #000000 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
