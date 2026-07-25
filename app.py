@@ -14,11 +14,6 @@ st.markdown("""
         background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%) !important;
     }
     
-    /* NASLOVI - ZLATNI */
-    h1, h2, h3, .stSubheader {
-        color: #d4af37 !important;
-    }
-    
     /* METRIKA U ADMINU */
     .stMetric > div {
         background-color: #87CEEB !important;
@@ -300,15 +295,12 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# NASLOV - KOD KUBANCA (ZLATNI)
+# NASLOV - SAMO ZAKAZIVANJE (ZLATNO)
 st.markdown("""
     <div style="text-align: center; padding: 10px 0 0 0; margin: 0;">
         <h1 style="color: #d4af37 !important; font-size: 3.5em; font-weight: 900; letter-spacing: 5px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 0; padding: 0;">
-            KOD KUBANCA
+            ZAKAZIVANJE
         </h1>
-        <h3 style="color: #d4af37 !important; font-weight: 300; letter-spacing: 3px; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); margin: 0; padding: 0;">
-            Zakazivanje
-        </h3>
     </div>
 """, unsafe_allow_html=True)
 
@@ -349,48 +341,45 @@ with tab1:
         if datumi_raw and usluge:
             osvezi_termine()
             
-            # ---------- KARTICA ZA UNOS PODATAKA - NEBO PLAVA SA ZLATNIM OKVIROM ----------
-            st.markdown("""
-            <div style="background-color: #87CEEB; padding: 25px; border-radius: 15px; border: 4px solid #d4af37; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-            """, unsafe_allow_html=True)
-            
-            # SVA 4 POLJA SA DIREKTNIM STILOVIMA
+            # ---------- STILOVI ZA POLJA ZA UNOS ----------
             st.markdown("""
             <style>
-                /* POLJA ZA UNOS - BRAON POZADINA, BELA SLOVA */
+                /* SVA 4 POLJA - BELA POZADINA, ZLATNI OKVIR */
                 .stTextInput > div > div > input {
-                    color: white !important;
-                    background-color: #4a2c1a !important;
-                    border: 2px solid #d4af37 !important;
+                    color: #4a2c1a !important;
+                    background-color: #ffffff !important;
+                    border: 3px solid #d4af37 !important;
                     border-radius: 8px !important;
+                    font-weight: bold !important;
                 }
                 .stTextInput > div > label {
-                    color: black !important;
+                    color: white !important;
                     font-weight: bold !important;
                 }
                 .stSelectbox > div > div > div {
-                    color: white !important;
-                    background-color: #4a2c1a !important;
-                    border: 2px solid #d4af37 !important;
+                    color: #4a2c1a !important;
+                    background-color: #ffffff !important;
+                    border: 3px solid #d4af37 !important;
                     border-radius: 8px !important;
+                    font-weight: bold !important;
                 }
                 .stSelectbox > div > label {
-                    color: black !important;
+                    color: white !important;
                     font-weight: bold !important;
                 }
                 .stSelectbox > div > div > div > div {
-                    background-color: #4a2c1a !important;
-                    color: white !important;
+                    background-color: #ffffff !important;
+                    color: #4a2c1a !important;
                 }
                 div[data-baseweb="select"] ul {
-                    background-color: #4a2c1a !important;
+                    background-color: #ffffff !important;
                 }
                 div[data-baseweb="select"] ul li {
-                    color: white !important;
+                    color: #4a2c1a !important;
                 }
                 div[data-baseweb="select"] ul li:hover {
                     background-color: #d4af37 !important;
-                    color: #4a2c1a !important;
+                    color: #ffffff !important;
                 }
             </style>
             """, unsafe_allow_html=True)
@@ -407,8 +396,6 @@ with tab1:
             usluga_trajanje = usluge[idx][2]
             
             datum = st.selectbox("Datum", datumi_raw, format_func=formatiraj_datum)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
             
             # ---------- TABELA TERMINA ----------
             st.subheader("📋 Slobodni termini")
