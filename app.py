@@ -546,22 +546,22 @@ with tab2:
         else:
             st.info("📭 Još uvek nema naplaćenih usluga.")
         
-        st.subheader("📋 Zakazani klijenti")
+       st.subheader("📋 Zakazani klijenti")
         
-        conn = sqlite3.connect('termini.db')
-        c = conn.cursor()
-        c.execute("""
-            SELECT ime, telefon, usluga, cena, datum, 
-                   MIN(vreme) as pocetak, MAX(vreme) as kraj,
-                   GROUP_CONCAT(id) as ids,
-                   COUNT(*) as broj_slotova
-            FROM rezervacije 
-            WHERE ime IS NOT NULL 
-            GROUP BY ime, telefon, datum, usluga, cena
-            ORDER BY datum ASC, pocetak ASC
-        """)
-        grupe = c.fetchall()
-        conn.close()
+conn = sqlite3.connect('termini.db')
+c = conn.cursor()
+c.execute("""
+    SELECT ime, telefon, usluga, cena, datum, 
+           MIN(vreme) as pocetak, MAX(vreme) as kraj,
+           GROUP_CONCAT(id) as ids,
+           COUNT(*) as broj_slotova
+    FROM rezervacije 
+    WHERE ime IS NOT NULL 
+    GROUP BY ime, telefon, datum, usluga, cena
+    ORDER BY datum || ' ' || MIN(vreme) ASC
+""")
+grupe = c.fetchall()
+conn.close()
         
         if grupe:
             for idx, red in enumerate(grupe, start=1):
