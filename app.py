@@ -9,6 +9,7 @@ BROJ_DANA = 7
 PAUZA_POCETAK = 12
 PAUZA_KRAJ = 13
 
+# 🔥 OVDE NALEPI SVOJ SUPABASE CONNECTION STRING
 DATABASE_URL = "postgresql://postgres:TVOJA_LOZINKA@db.TVOJ_ID.supabase.co:5432/postgres"
 
 def get_db():
@@ -123,16 +124,13 @@ def osvezi_termine():
         generisi_slotove_za_dan(d)
     return True
 
-def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
-    conn = get_db()
-    c = conn.cursor()
-    
-    # 🔥 Izračunaj broj slotova
+def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     broj_slotova = trajanje // INTERVAL_MIN
     if trajanje % INTERVAL_MIN != 0:
         broj_slotova += 1
     
-    # 🔥 Dohvati vremena slotova koje treba zauzeti
+    conn = get_db()
+    c = conn.cursor()
     c.execute("""
         SELECT vreme FROM rezervacije 
         WHERE datum=%s AND vreme >= %s AND ime IS NULL 
@@ -140,31 +138,49 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     """, (datum, pocetak, broj_slotova))
     
     vremena = [row[0] for row in c.fetchall()]
+    conn.close()
     
     if len(vremena) < broj_slotova:
-        conn.close()
         return False
     
-    # 🔥 Provera uzastopnosti
     for i in range(broj_slotova - 1):
         t1 = datetime.strptime(vremena[i], "%H:%M")
         t2 = datetime.strptime(vremena[i+1], "%H:%M")
         if (t2 - t1).seconds // 60 != INTERVAL_MIN:
-            conn.close()
             return False
     
-    # 🔥 Ažuriraj SVE slotove (ne samo prvi)
-    for vreme in vremena:
+    return True
+
+def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
+    conn = get_db()
+    c = conn.cursor()
+    
+    broj_slotova = trajanje // INTERVAL_MIN
+    if trajanje % INTERVAL_MIN != 0:
+        broj_slotova += 1
+    
+    c.execute("""
+        SELECT id FROM rezervacije 
+        WHERE datum=%s AND vreme >= %s AND ime IS NULL 
+        ORDER BY vreme ASC LIMIT %s
+    """, (datum, pocetak, broj_slotova))
+    
+    ids = [row[0] for row in c.fetchall()]
+    
+    if len(ids) < broj_slotova:
+        conn.close()
+        return False
+    
+    for id in ids:
         c.execute("""
             UPDATE rezervacije 
             SET ime=%s, telefon=%s, usluga=%s, cena=%s, naplaceno=0 
-            WHERE datum=%s AND vreme=%s
-        """, (ime, telefon, usluga, cena, datum, vreme))
+            WHERE id=%s
+        """, (ime, telefon, usluga, cena, id))
     
     conn.commit()
     conn.close()
     
-    # Provera
     conn2 = get_db()
     c2 = conn2.cursor()
     c2.execute("SELECT COUNT(*) FROM rezervacije WHERE ime=%s AND datum=%s AND vreme=%s", (ime, datum, pocetak))
@@ -207,7 +223,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje):
         for j, (vreme, ime_slota) in enumerate(row):
             with cols[j]:
                 if ime_slota is None or ime_slota == "":
-                    # 🔥 Provera da li ima dovoljno mesta pre nego što ponudi klik
                     if dovoljno_slobodnih_slotova(datum, vreme, usluga_trajanje):
                         if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
                             kliknuto_vreme = vreme
@@ -225,34 +240,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje):
                     """, unsafe_allow_html=True)
     
     return kliknuto_vreme
-
-# 🔥 DODATA FUNKCIJA ZA PROVERU SLOBODNIH SLOTOVA
-def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
-    broj_slotova = trajanje // INTERVAL_MIN
-    if trajanje % INTERVAL_MIN != 0:
-        broj_slotova += 1
-    
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        SELECT vreme FROM rezervacije 
-        WHERE datum=%s AND vreme >= %s AND ime IS NULL 
-        ORDER BY vreme ASC LIMIT %s
-    """, (datum, pocetak, broj_slotova))
-    
-    vremena = [row[0] for row in c.fetchall()]
-    conn.close()
-    
-    if len(vremena) < broj_slotova:
-        return False
-    
-    for i in range(broj_slotova - 1):
-        t1 = datetime.strptime(vremena[i], "%H:%M")
-        t2 = datetime.strptime(vremena[i+1], "%H:%M")
-        if (t2 - t1).seconds // 60 != INTERVAL_MIN:
-            return False
-    
-    return True
 
 # ---------- UI ----------
 st.set_page_config(page_title="💈 Zakazivanje", layout="centered")
