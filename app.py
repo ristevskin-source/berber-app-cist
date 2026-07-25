@@ -203,15 +203,9 @@ def prikazi_tabelu_termina(datum, usluga_trajanje):
         for j, (vreme, ime_slota) in enumerate(row):
             with cols[j]:
                 if ime_slota is None or ime_slota == "":
-                    if dovoljno_slobodnih_slotova(datum, vreme, usluga_trajanje):
-                        if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
-                            kliknuto_vreme = vreme
-                    else:
-                        st.markdown(f"""
-                        <div style="background-color:#5a4a3a; color:#888888; border:1px solid #6a5a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.6;">
-                            {vreme}
-                        </div>
-                        """, unsafe_allow_html=True)
+                    # 🔥 SVI SLOBODNI SLOTOVI SU ZELENI (BEZ PROVERE)
+                    if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
+                        kliknuto_vreme = vreme
                 else:
                     st.markdown(f"""
                     <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
@@ -279,7 +273,6 @@ with tab1:
             st.markdown("""
             <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
                 <span>🟢 <span style="color: #aaa;">Slobodan termin</span></span>
-                <span>🟡 <span style="color: #aaa;">Slobodan, ali nedovoljno dug</span></span>
                 <span>🔴 <span style="color: #aaa;">Zauzet termin</span></span>
             </div>
             """, unsafe_allow_html=True)
@@ -288,19 +281,24 @@ with tab1:
             
             if kliknuto_vreme:
                 if ime and tel:
-                    if rezervisi_blok(datum, kliknuto_vreme, usluga_trajanje, ime, tel, usluga_ime, usluga_cena):
-                        st.session_state['booking_success'] = True
-                        st.session_state['booking_details'] = {
-                            'usluga': usluga_ime,
-                            'datum': datum,
-                            'vreme': kliknuto_vreme,
-                            'trajanje': usluga_trajanje,
-                            'cena': usluga_cena,
-                            'ime': ime
-                        }
-                        st.rerun()
+                    # 🔥 PROVERA TEK NAKON KLIKA
+                    if dovoljno_slobodnih_slotova(datum, kliknuto_vreme, usluga_trajanje):
+                        if rezervisi_blok(datum, kliknuto_vreme, usluga_trajanje, ime, tel, usluga_ime, usluga_cena):
+                            st.session_state['booking_success'] = True
+                            st.session_state['booking_details'] = {
+                                'usluga': usluga_ime,
+                                'datum': datum,
+                                'vreme': kliknuto_vreme,
+                                'trajanje': usluga_trajanje,
+                                'cena': usluga_cena,
+                                'ime': ime
+                            }
+                            st.rerun()
+                        else:
+                            st.error("❌ Greška pri rezervaciji. Pokušajte ponovo.")
+                            st.rerun()
                     else:
-                        st.error("❌ Greška pri rezervaciji. Pokušajte ponovo.")
+                        st.error("❌ Nema dovoljno slobodnih termina za ovu uslugu u izabrano vreme.")
                         st.rerun()
                 else:
                     st.warning("⚠️ Popunite ime i telefon pre nego što kliknete na termin.")
