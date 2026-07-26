@@ -4,6 +4,15 @@ import os
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="💈 Berberski salon - Zakazivanje", layout="centered")
+# DUGME NA VRHU - UVEK VIDLJIVO
+st.markdown("""
+    <div style="position: sticky; top: 0; background-color: #4a2c1a; padding: 10px; z-index: 1000; text-align: center; border-bottom: 3px solid #d4af37;">
+        <a href="https://berber-app-cist.streamlit.app" target="_blank" 
+           style="background-color: #d4af37; color: #4a2c1a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 20px; border: 2px solid #b8960a; box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: inline-block;">
+            📤 Podeli link
+        </a>
+    </div>
+""", unsafe_allow_html=True)
 
 RADNO_VREME = [(9,0), (20,0)]
 INTERVAL_MIN = 15
