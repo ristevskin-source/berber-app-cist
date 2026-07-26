@@ -3,7 +3,9 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 
-# DUGME NA VRHU
+st.set_page_config(page_title="💈 Berberski salon - Zakazivanje", layout="centered")
+
+# ---------- DUGME NA VRHU ----------
 st.markdown("""
     <div style="position: sticky; top: 0; background-color: #4a2c1a; padding: 10px; z-index: 1000; text-align: center; border-bottom: 3px solid #d4af37;">
         <a href="https://berber-app-cist-tfszfp2lsm8d2m2qnsb5ap.streamlit.app/" target="_blank" 
@@ -76,10 +78,49 @@ def generisi_datume():
             datumi.append(dan.strftime("%Y-%m-%d"))
     return datumi
 
+def sacuvaj_rezervacije_pre_osvezavanja(datum):
+    """Čuva postojeće rezervacije pre regenerisanja slotova"""
+    conn = sqlite3.connect('termini.db')
+    c = conn.cursor()
+    
+    c.execute("""
+        SELECT usluga, datum, vreme, ime, telefon, cena, naplaceno, datum_naplate 
+        FROM rezervacije 
+        WHERE datum=? AND ime IS NOT NULL AND ime != ''
+    """, (datum,))
+    rezervacije = c.fetchall()
+    conn.close()
+    
+    return rezervacije
+
+def vrati_rezervacije_posle_osvezavanja(datum, rezervacije):
+    """Vraća sačuvane rezervacije nakon regenerisanja"""
+    if not rezervacije:
+        return
+    
+    conn = sqlite3.connect('termini.db')
+    c = conn.cursor()
+    
+    for usluga, datum, vreme, ime, telefon, cena, naplaceno, datum_naplate in rezervacije:
+        c.execute("SELECT id FROM rezervacije WHERE datum=? AND vreme=? AND ime IS NULL", (datum, vreme))
+        result = c.fetchone()
+        if result:
+            slot_id = result[0]
+            c.execute("""
+                UPDATE rezervacije 
+                SET usluga=?, ime=?, telefon=?, cena=?, naplaceno=?, datum_naplate=?
+                WHERE id=?
+            """, (usluga, ime, telefon, cena, naplaceno, datum_naplate, slot_id))
+    
+    conn.commit()
+    conn.close()
+
 def generisi_slotove_za_dan(datum_str):
     dan = datetime.strptime(datum_str, "%Y-%m-%d")
     if dan.weekday() == 6:
         return
+    
+    rezervacije = sacuvaj_rezervacije_pre_osvezavanja(datum_str)
     
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
@@ -109,6 +150,9 @@ def generisi_slotove_za_dan(datum_str):
         c.executemany("INSERT INTO rezervacije (usluga, datum, vreme, ime, telefon, cena, naplaceno, datum_naplate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", slotovi)
         conn.commit()
     conn.close()
+    
+    if rezervacije:
+        vrati_rezervacije_posle_osvezavanja(datum_str, rezervacije)
 
 def osvezi_termine():
     datumi = generisi_datume()
@@ -240,7 +284,7 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                 if ime_slota is None or ime_slota == "":
                     if mode == "admin":
                         st.markdown(f"""
-                        <div style="background-color:#d4af37; color:#4a2c1a; border:2px solid #b8960a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
+                        <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
                             🟢 {vreme}
                         </div>
                         """, unsafe_allow_html=True)
@@ -249,7 +293,7 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                             kliknuto_vreme = vreme
                 else:
                     st.markdown(f"""
-                    <div style="background-color:#d4af37; color:#4a2c1a; border:2px solid #b8960a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
+                    <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
                         🔴 {vreme}
                     </div>
                     """, unsafe_allow_html=True)
@@ -257,110 +301,7 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     return kliknuto_vreme
 
 # ---------- UI ----------
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #4a2c1a !important;
-        background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%) !important;
-    }
-    
-    .stMetric > div {
-        background-color: #87CEEB !important;
-        border-radius: 10px !important;
-        padding: 10px !important;
-        border: 2px solid #d4af37 !important;
-    }
-    .stMetric > div > div {
-        color: #000000 !important;
-        font-weight: bold !important;
-    }
-    .stMetric > div > div > div {
-        color: #000000 !important;
-        font-weight: bold !important;
-    }
-    
-    .stButton > button {
-        background-color: #d4af37 !important;
-        color: #4a2c1a !important;
-        font-weight: bold !important;
-        border: 2px solid #b8960a !important;
-        border-radius: 8px !important;
-    }
-    .stButton > button:hover {
-        background-color: #e8c84a !important;
-        border-color: #d4af37 !important;
-    }
-    
-    .stTextInput > div > div > input {
-        color: #4a2c1a !important;
-        background-color: #ffffff !important;
-        border: 3px solid #d4af37 !important;
-        border-radius: 8px !important;
-        font-weight: bold !important;
-        font-size: 16px !important;
-    }
-    .stSelectbox > div > div > div {
-        color: #4a2c1a !important;
-        background-color: #ffffff !important;
-        border: 3px solid #d4af37 !important;
-        border-radius: 8px !important;
-        font-weight: bold !important;
-        font-size: 16px !important;
-    }
-    .stSelectbox > div > div > div > div {
-        background-color: #ffffff !important;
-        color: #4a2c1a !important;
-    }
-    div[data-baseweb="select"] ul {
-        background-color: #ffffff !important;
-    }
-    div[data-baseweb="select"] ul li {
-        color: #4a2c1a !important;
-    }
-    div[data-baseweb="select"] ul li:hover {
-        background-color: #d4af37 !important;
-        color: #ffffff !important;
-    }
-    
-    .stTextInput label, .stSelectbox label {
-        color: #d0d0d0 !important;
-        font-weight: bold !important;
-        font-size: 15px !important;
-    }
-    
-    h1, h2, h3, .stSubheader {
-        color: #d4af37 !important;
-    }
-    
-    /* CRNI TEKST ZA NAZIVE USLUGA U ADMIN PANELU */
-    .stWrite, .stMarkdown, .stText {
-        color: #000000 !important;
-    }
-    .stWrite p, .stMarkdown p, .stText p {
-        color: #000000 !important;
-    }
-    div[data-testid="stColumn"] p {
-        color: #000000 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# LOGO
-st.markdown("""
-    <div style="width: 100%; margin-bottom: 0; padding: 0;">
-        <img src="https://raw.githubusercontent.com/ristevskin-source/berber-app-cist/main/IMG-c75b1bbded411581450ad9e3374dbc68-V(1).jpg" 
-             style="width: 100%; height: auto; display: block; border-radius: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-    </div>
-""", unsafe_allow_html=True)
-
-# NASLOV
-st.markdown("""
-    <div style="text-align: center; padding: 10px 0 0 0; margin: 0;">
-        <h1 style="color: #d4af37; font-size: 28px; font-weight: 900; letter-spacing: 3px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 0; padding: 0; word-wrap: break-word;">
-            ZAKAZIVANJE
-        </h1>
-    </div>
-""", unsafe_allow_html=True)
+st.title("💈 Berberski salon - Zakazivanje")
 
 st.divider()
 
@@ -416,8 +357,8 @@ with tab1:
             
             st.markdown("""
             <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
-                <span>🟢 <span style="color: #d0d0d0;">Slobodan termin</span></span>
-                <span>🔴 <span style="color: #d0d0d0;">Zauzet termin</span></span>
+                <span>🟢 <span style="color: #aaa;">Slobodan termin</span></span>
+                <span>🔴 <span style="color: #aaa;">Zauzet termin</span></span>
             </div>
             """, unsafe_allow_html=True)
             
@@ -454,6 +395,7 @@ with tab1:
                     st.rerun()
         else:
             st.error("❌ Baza je prazna.")
+
 with tab2:
     if "admin" not in st.session_state:
         st.session_state.admin = False
@@ -554,83 +496,104 @@ with tab2:
         else:
             st.info("📭 Još uvek nema naplaćenih usluga.")
         
+        # ---------- ZAKAZANI KLIJENTI - FILTER PO DATUMU ----------
         st.subheader("📋 Zakazani klijenti")
-        
+
+        # Padajući meni za izbor datuma
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
-        c.execute("""
-            SELECT ime, telefon, usluga, cena, datum, 
-                   MIN(vreme) as pocetak, MAX(vreme) as kraj,
-                   GROUP_CONCAT(id) as ids,
-                   COUNT(*) as broj_slotova
-            FROM rezervacije 
-            WHERE ime IS NOT NULL 
-            GROUP BY ime, telefon, datum, usluga, cena
-            ORDER BY datum || ' ' || MIN(vreme) ASC
-        """)
-        grupe = c.fetchall()
+        c.execute("SELECT DISTINCT datum FROM rezervacije WHERE ime IS NOT NULL ORDER BY datum ASC")
+        dostupni_datumi = [row[0] for row in c.fetchall()]
         conn.close()
-        
-        if grupe:
-            for idx, red in enumerate(grupe, start=1):
-                ime, telefon, usluga, cena, datum, pocetak, kraj, ids, broj_slotova = red
-                
-                t1 = datetime.strptime(pocetak, "%H:%M")
-                t2 = datetime.strptime(kraj, "%H:%M")
-                trajanje = (t2 - t1).seconds // 60 + INTERVAL_MIN
-                
-                st.markdown(f"""
-                <div style="background-color:#3a3a3a; border-radius:12px; padding:12px 16px; margin:8px 0; border:2px solid #d4af37; box-shadow:0 2px 8px rgba(212,175,55,0.15);">
-                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                        <span style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                            <span style="color: #d4af37; font-weight: bold;">#{idx}</span>
-                            <span style="color: #ffffff; font-weight: bold;">{ime}</span>
-                            <span style="color: #d0d0d0;">📞 {telefon}</span>
-                            <span style="color: #d0d0d0;">✂️ {usluga}</span>
-                            <span style="color: #d0d0d0;">📅 {formatiraj_datum(datum)}</span>
-                            <span style="color: #d0d0d0;">⏰ {pocetak} - {kraj} ({trajanje} min)</span>
-                            <span style="color: #d4af37; font-weight: bold;">{cena} din</span>
-                        </span>
-                        <span>
-                """, unsafe_allow_html=True)
-                
-                first_id = int(ids.split(',')[0])
-                conn2 = sqlite3.connect('termini.db')
-                c2 = conn2.cursor()
-                c2.execute("SELECT naplaceno FROM rezervacije WHERE id=?", (first_id,))
-                naplaceno = c2.fetchone()[0]
-                conn2.close()
-                
-                if naplaceno == 1:
-                    st.markdown('<span style="color: #4ac24a;">✅ Naplaćeno</span>', unsafe_allow_html=True)
-                else:
-                    if st.button(f"💰 Naplati", key=f"pay_{idx}"):
-                        conn3 = sqlite3.connect('termini.db')
-                        c3 = conn3.cursor()
-                        for id in ids.split(','):
-                            c3.execute("UPDATE rezervacije SET naplaceno=1, datum_naplate=? WHERE id=?", (datetime.now().strftime("%Y-%m-%d"), int(id)))
-                        conn3.commit()
-                        conn3.close()
-                        st.success(f"✅ Naplaćeno: {ime}")
-                        st.rerun()
-                    if st.button(f"🗑️ Otkaži", key=f"cancel_{idx}"):
-                        conn4 = sqlite3.connect('termini.db')
-                        c4 = conn4.cursor()
-                        for id in ids.split(','):
-                            c4.execute("UPDATE rezervacije SET ime=NULL, telefon=NULL, usluga=NULL, cena=NULL, naplaceno=0 WHERE id=?", (int(id),))
-                        conn4.commit()
-                        conn4.close()
-                        st.success(f"🗑️ Otkazano: {ime}")
-                        st.rerun()
-                
-                st.markdown("""
-                        </span>
+
+        if dostupni_datumi:
+            izabrani_datum = st.selectbox(
+                "Izaberite datum za pregled",
+                dostupni_datumi,
+                format_func=formatiraj_datum,
+                key="admin_klijenti_datum"
+            )
+            
+            conn = sqlite3.connect('termini.db')
+            c = conn.cursor()
+            c.execute("""
+                SELECT ime, telefon, usluga, cena, datum, 
+                       MIN(vreme) as pocetak, MAX(vreme) as kraj,
+                       GROUP_CONCAT(id) as ids,
+                       COUNT(*) as broj_slotova
+                FROM rezervacije 
+                WHERE ime IS NOT NULL AND datum=?
+                GROUP BY ime, telefon, datum, usluga, cena
+                ORDER BY MIN(vreme) ASC
+            """, (izabrani_datum,))
+            grupe = c.fetchall()
+            conn.close()
+            
+            if grupe:
+                for idx, red in enumerate(grupe, start=1):
+                    ime, telefon, usluga, cena, datum, pocetak, kraj, ids, broj_slotova = red
+                    
+                    t1 = datetime.strptime(pocetak, "%H:%M")
+                    t2 = datetime.strptime(kraj, "%H:%M")
+                    trajanje = (t2 - t1).seconds // 60 + INTERVAL_MIN
+                    
+                    st.markdown(f"""
+                    <div style="background-color:#3a3a3a; border-radius:12px; padding:12px 16px; margin:8px 0; border:2px solid #d4af37; box-shadow:0 2px 8px rgba(212,175,55,0.15);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                            <span style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                <span style="color: #d4af37; font-weight: bold;">#{idx}</span>
+                                <span style="color: #ffffff; font-weight: bold;">{ime}</span>
+                                <span style="color: #d0d0d0;">📞 {telefon}</span>
+                                <span style="color: #d0d0d0;">✂️ {usluga}</span>
+                                <span style="color: #d0d0d0;">⏰ {pocetak} - {kraj} ({trajanje} min)</span>
+                                <span style="color: #d4af37; font-weight: bold;">{cena} din</span>
+                            </span>
+                            <span>
+                    """, unsafe_allow_html=True)
+                    
+                    first_id = int(ids.split(',')[0])
+                    conn2 = sqlite3.connect('termini.db')
+                    c2 = conn2.cursor()
+                    c2.execute("SELECT naplaceno FROM rezervacije WHERE id=?", (first_id,))
+                    naplaceno = c2.fetchone()[0]
+                    conn2.close()
+                    
+                    if naplaceno == 1:
+                        st.markdown('<span style="color: #4ac24a;">✅ Naplaćeno</span>', unsafe_allow_html=True)
+                    else:
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button(f"💰 Naplati", key=f"pay_{idx}"):
+                                conn3 = sqlite3.connect('termini.db')
+                                c3 = conn3.cursor()
+                                for id in ids.split(','):
+                                    c3.execute("UPDATE rezervacije SET naplaceno=1, datum_naplate=? WHERE id=?", (datetime.now().strftime("%Y-%m-%d"), int(id)))
+                                conn3.commit()
+                                conn3.close()
+                                st.success(f"✅ Naplaćeno: {ime}")
+                                st.rerun()
+                        with col2:
+                            if st.button(f"🗑️ Otkaži", key=f"cancel_{idx}"):
+                                conn4 = sqlite3.connect('termini.db')
+                                c4 = conn4.cursor()
+                                for id in ids.split(','):
+                                    c4.execute("UPDATE rezervacije SET ime=NULL, telefon=NULL, usluga=NULL, cena=NULL, naplaceno=0 WHERE id=?", (int(id),))
+                                conn4.commit()
+                                conn4.close()
+                                st.success(f"🗑️ Otkazano: {ime}")
+                                st.rerun()
+                    
+                    st.markdown("""
+                            </span>
+                        </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+            else:
+                st.info(f"📭 Nema zakazanih klijenata za {formatiraj_datum(izabrani_datum)}.")
         else:
             st.info("📭 Trenutno nema zakazanih klijenata.")
         
+        # ---------- TABELA TERMINA ZA ADMINA ----------
         st.subheader("📋 Pregled termina (admin)")
         
         conn = sqlite3.connect('termini.db')
@@ -646,13 +609,14 @@ with tab2:
             st.write("**Status termina:**")
             st.markdown("""
             <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
-                <span>🟢 <span style="color: #d0d0d0;">Slobodan termin</span></span>
-                <span>🔴 <span style="color: #d0d0d0;">Zauzet termin</span></span>
+                <span>🟢 <span style="color: #aaa;">Slobodan termin</span></span>
+                <span>🔴 <span style="color: #aaa;">Zauzet termin</span></span>
             </div>
             """, unsafe_allow_html=True)
             
             prikazi_tabelu_termina(admin_datum, 0, mode="admin")
         
+        # ---------- UPRAVLJANJE USLUGAMA ----------
         st.subheader("📝 Upravljanje uslugama")
         
         with st.form("dodaj_uslugu"):
