@@ -198,13 +198,11 @@ def generisi_slotove_za_dan(datum_str):
     if dan.weekday() == 6:
         return
     
-    # SAČUVAJ ZAUZETE TERMINE
     rezervacije = sacuvaj_rezervacije_pre_osvezavanja(datum_str)
     
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    # OBRISI SAMO SLOBODNE SLOTOVE
     c.execute("DELETE FROM rezervacije WHERE datum=? AND ime IS NULL", (datum_str,))
     
     sat_start, min_start = RADNO_VREME[0]
@@ -212,7 +210,6 @@ def generisi_slotove_za_dan(datum_str):
     trenutno = datetime.strptime(datum_str, "%Y-%m-%d").replace(hour=sat_start, minute=min_start)
     kraj = datetime.strptime(datum_str, "%Y-%m-%d").replace(hour=sat_kraj, minute=min_kraj)
     
-    # Pauze
     c.execute("SELECT vreme FROM pauze WHERE datum=?", (datum_str,))
     pauze = [row[0] for row in c.fetchall()]
     for i in range(PAUZA_POCETAK*4, PAUZA_KRAJ*4):
@@ -220,7 +217,6 @@ def generisi_slotove_za_dan(datum_str):
         if vreme not in pauze:
             pauze.append(vreme)
     
-    # KREIRAJ SVE SLOTOVE ZA CEO DAN
     slotovi = []
     while trenutno < kraj:
         vreme = trenutno.strftime("%H:%M")
@@ -233,7 +229,6 @@ def generisi_slotove_za_dan(datum_str):
         conn.commit()
     conn.close()
     
-    # VRATI ZAUZETE TERMINE
     if rezervacije:
         vrati_rezervacije_posle_osvezavanja(datum_str, rezervacije)
 
@@ -256,14 +251,12 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
-    # 1. Proveri sve ZAUZETE termine na taj dan
     c.execute("""
         SELECT vreme, usluga FROM rezervacije 
         WHERE datum=? AND ime IS NOT NULL AND ime != ''
     """, (datum,))
     zauzeti = c.fetchall()
     
-    # 2. Proveri da li se novi termin preklapa SA BILO KOJIM zauzetim
     for zauzet_vreme, zauzeta_usluga in zauzeti:
         zauzet_dt = datetime.strptime(zauzet_vreme, "%H:%M")
         c.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (zauzeta_usluga,))
@@ -273,12 +266,10 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
             zauzet_trajanje = result[0]
             zauzet_kraj_dt = zauzet_dt + timedelta(minutes=zauzet_trajanje)
             
-            # Provera preklapanja:
             if not (kraj_dt <= zauzet_dt or pocetak_dt >= zauzet_kraj_dt):
                 conn.close()
-                return False  # IMA PREKLAPANJA!
+                return False
     
-    # 3. Proveri da li ima dovoljno SLOBODNIH slotova
     c.execute("""
         SELECT vreme FROM rezervacije 
         WHERE datum=? AND vreme >= ? AND vreme < ? AND ime IS NULL 
@@ -290,7 +281,6 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     if len(slobodni) < broj_slotova:
         return False
     
-    # Proveri da li su slotovi uzastopni (bez pauza)
     for i in range(broj_slotova - 1):
         t1 = datetime.strptime(slobodni[i], "%H:%M")
         t2 = datetime.strptime(slobodni[i+1], "%H:%M")
@@ -354,63 +344,65 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
         st.warning("⏳ Nema termina za izabrani datum.")
         return None
     
-    # Kreiraj mapu slotova sa trajanjem
-    slotovi_map = {}
+    # Prvo napravi listu svih slotova sa njihovim statusom
+    slotovi_lista = []
     for vreme, ime, usluga in svi_slotovi:
-        if vreme not in slotovi_map:
-            trajanje = 15  # default
-            if ime and ime != "" and usluga:
-                conn2 = sqlite3.connect('termini.db')
-                c2 = conn2.cursor()
-                c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
-                result = c2.fetchone()
-                conn2.close()
-                if result:
-                    trajanje = result[0]
-            slotovi_map[vreme] = {
-                'ime': ime,
-                'trajanje': trajanje if ime else 15,
-                'zauzet': ime is not None and ime != ""
-            }
+        trajanje = 15  # default za slobodan slot
+        if ime and ime != "" and usluga:
+            conn2 = sqlite3.connect('termini.db')
+            c2 = conn2.cursor()
+            c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
+            result = c2.fetchone()
+            conn2.close()
+            if result:
+                trajanje = result[0]
+        
+        slotovi_lista.append({
+            'vreme': vreme,
+            'ime': ime,
+            'usluga': usluga,
+            'trajanje': trajanje if ime else 15,
+            'zauzet': ime is not None and ime != ""
+        })
     
     # Sortiraj po vremenu
-    svi_slotovi = sorted(slotovi_map.items())
+    slotovi_lista.sort(key=lambda x: x['vreme'])
     
+    # Kreiraj prikaz za svaki slot
     cols_per_row = 4
-    rows = [svi_slotovi[i:i+cols_per_row] for i in range(0, len(svi_slotovi), cols_per_row)]
+    rows = [slotovi_lista[i:i+cols_per_row] for i in range(0, len(slotovi_lista), cols_per_row)]
     
     kliknuto_vreme = None
     
     for row in rows:
         cols = st.columns(cols_per_row)
-        for j, (vreme, info) in enumerate(row):
+        for j, slot in enumerate(row):
             with cols[j]:
-                if not info['zauzet']:
+                if not slot['zauzet']:
+                    # SLOBODAN TERMIN
                     if mode == "admin":
                         st.markdown(f"""
                         <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
-                            🟢 {vreme}
+                            🟢 {slot['vreme']}
                         </div>
                         """, unsafe_allow_html=True)
                     else:
-                        if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
-                            kliknuto_vreme = vreme
+                        if st.button(f"🟢 {slot['vreme']}", key=f"slot_{datum}_{slot['vreme']}", use_container_width=True):
+                            kliknuto_vreme = slot['vreme']
                 else:
-                    # Pokaži i kraj termina
-                    kraj_vreme = vreme
-                    trajanje = info['trajanje']
-                    if trajanje > 0:
-                        pocetak_dt = datetime.strptime(vreme, "%H:%M")
-                        kraj_dt = pocetak_dt + timedelta(minutes=trajanje)
-                        kraj_vreme = kraj_dt.strftime("%H:%M")
+                    # ZAUZET TERMIN - prikaži tačan opseg
+                    pocetak_dt = datetime.strptime(slot['vreme'], "%H:%M")
+                    kraj_dt = pocetak_dt + timedelta(minutes=slot['trajanje'])
+                    kraj_vreme = kraj_dt.strftime("%H:%M")
                     
                     st.markdown(f"""
                     <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
-                        🔴 {vreme} - {kraj_vreme}
+                        🔴 {slot['vreme']} - {kraj_vreme}
                     </div>
                     """, unsafe_allow_html=True)
     
     return kliknuto_vreme
+
 # ---------- UI ----------
 # LOGO
 st.markdown("""
