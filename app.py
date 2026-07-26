@@ -526,7 +526,6 @@ with tab2:
         # ---------- ZAKAZANI KLIJENTI - FILTER PO DATUMU ----------
         st.subheader("📋 Zakazani klijenti")
 
-        # Padajući meni za izbor datuma
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
         c.execute("SELECT DISTINCT datum FROM rezervacije WHERE ime IS NOT NULL ORDER BY datum ASC")
@@ -621,7 +620,7 @@ with tab2:
             st.info("📭 Trenutno nema zakazanih klijenata.")
         
         # ---------- TABELA TERMINA ZA ADMINA ----------
-                st.subheader("📋 Pregled termina (admin)")
+        st.subheader("📋 Pregled termina (admin)")
         
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
@@ -649,6 +648,7 @@ with tab2:
         else:
             st.info("📭 Trenutno nema termina ni za jedan dan.")
         
+        # ---------- UPRAVLJANJE USLUGAMA ----------
         st.subheader("📝 Upravljanje uslugama")
         
         with st.form("dodaj_uslugu"):
