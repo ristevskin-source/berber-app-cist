@@ -621,37 +621,34 @@ with tab2:
             st.info("📭 Trenutno nema zakazanih klijenata.")
         
         # ---------- TABELA TERMINA ZA ADMINA ----------
-        st.subheader("📋 Pregled termina (admin)")
+                st.subheader("📋 Pregled termina (admin)")
         
-conn = sqlite3.connect('termini.db')
-c = conn.cursor()
-# Dohvati sve datume koji imaju termine (i slobodne i zauzete)
-c.execute("SELECT DISTINCT datum FROM rezervacije ORDER BY datum ASC")
-svi_datumi = [row[0] for row in c.fetchall()]
-conn.close()
+        conn = sqlite3.connect('termini.db')
+        c = conn.cursor()
+        c.execute("SELECT DISTINCT datum FROM rezervacije ORDER BY datum ASC")
+        svi_datumi = [row[0] for row in c.fetchall()]
+        conn.close()
 
-if svi_datumi:
-    admin_datum = st.selectbox(
-        "Izaberite datum za pregled", 
-        svi_datumi, 
-        format_func=formatiraj_datum, 
-        key="admin_datum_pregled"
-    )
-    
-    st.write("**Status termina:**")
-    st.markdown("""
-    <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
-        <span>🟢 <span style="color: #aaa;">Slobodan termin</span></span>
-        <span>🔴 <span style="color: #aaa;">Zauzet termin</span></span>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Prikazuje samo za izabrani datum
-    prikazi_tabelu_termina(admin_datum, 0, mode="admin")
-else:
-    st.info("📭 Trenutno nema termina ni za jedan dan.")
+        if svi_datumi:
+            admin_datum = st.selectbox(
+                "Izaberite datum za pregled", 
+                svi_datumi, 
+                format_func=formatiraj_datum, 
+                key="admin_datum_pregled"
+            )
+            
+            st.write("**Status termina:**")
+            st.markdown("""
+            <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
+                <span>🟢 <span style="color: #aaa;">Slobodan termin</span></span>
+                <span>🔴 <span style="color: #aaa;">Zauzet termin</span></span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            prikazi_tabelu_termina(admin_datum, 0, mode="admin")
+        else:
+            st.info("📭 Trenutno nema termina ni za jedan dan.")
         
-        # ---------- UPRAVLJANJE USLUGAMA ----------
         st.subheader("📝 Upravljanje uslugama")
         
         with st.form("dodaj_uslugu"):
