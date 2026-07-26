@@ -301,7 +301,23 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     return kliknuto_vreme
 
 # ---------- UI ----------
-st.title("💈 Berberski salon - Zakazivanje")
+# ---------- UI ----------
+# LOGO
+st.markdown("""
+    <div style="width: 100%; margin-bottom: 0; padding: 0;">
+        <img src="https://raw.githubusercontent.com/ristevskin-source/berber-app-cist/main/IMG-c75b1bbded411581450ad9e3374dbc68-V(1).jpg" 
+             style="width: 100%; height: auto; display: block; border-radius: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+    </div>
+""", unsafe_allow_html=True)
+
+# NASLOV
+st.markdown("""
+    <div style="text-align: center; padding: 10px 0 0 0; margin: 0;">
+        <h1 style="color: #d4af37; font-size: 28px; font-weight: 900; letter-spacing: 3px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 0; padding: 0; word-wrap: break-word;">
+            ZAKAZIVANJE
+        </h1>
+    </div>
+""", unsafe_allow_html=True)
 
 st.divider()
 
