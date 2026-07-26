@@ -198,11 +198,13 @@ def generisi_slotove_za_dan(datum_str):
     if dan.weekday() == 6:
         return
     
+    # SAČUVAJ ZAUZETE TERMINE
     rezervacije = sacuvaj_rezervacije_pre_osvezavanja(datum_str)
     
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
+    # OBRISI SAMO SLOBODNE SLOTOVE
     c.execute("DELETE FROM rezervacije WHERE datum=? AND ime IS NULL", (datum_str,))
     
     sat_start, min_start = RADNO_VREME[0]
@@ -210,6 +212,7 @@ def generisi_slotove_za_dan(datum_str):
     trenutno = datetime.strptime(datum_str, "%Y-%m-%d").replace(hour=sat_start, minute=min_start)
     kraj = datetime.strptime(datum_str, "%Y-%m-%d").replace(hour=sat_kraj, minute=min_kraj)
     
+    # Pauze
     c.execute("SELECT vreme FROM pauze WHERE datum=?", (datum_str,))
     pauze = [row[0] for row in c.fetchall()]
     for i in range(PAUZA_POCETAK*4, PAUZA_KRAJ*4):
@@ -217,6 +220,7 @@ def generisi_slotove_za_dan(datum_str):
         if vreme not in pauze:
             pauze.append(vreme)
     
+    # KREIRAJ SVE SLOTOVE ZA CEO DAN
     slotovi = []
     while trenutno < kraj:
         vreme = trenutno.strftime("%H:%M")
@@ -229,6 +233,7 @@ def generisi_slotove_za_dan(datum_str):
         conn.commit()
     conn.close()
     
+    # VRATI ZAUZETE TERMINE
     if rezervacije:
         vrati_rezervacije_posle_osvezavanja(datum_str, rezervacije)
 
@@ -406,7 +411,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                     """, unsafe_allow_html=True)
     
     return kliknuto_vreme
-
 # ---------- UI ----------
 # LOGO
 st.markdown("""
