@@ -5,6 +5,17 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="💈 Berberski salon - Zakazivanje", layout="centered")
 
+# ---------- STILOVI ----------
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #4a2c1a !important;
+        background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%) !important;
+    }
+    ... (ostatak CSS-a) ...
+</style>
+""", unsafe_allow_html=True)
+
 # ---------- DUGME NA VRHU ----------
 st.markdown("""
     <div style="position: sticky; top: 0; background-color: #4a2c1a; padding: 10px; z-index: 1000; text-align: center; border-bottom: 3px solid #d4af37;">
