@@ -12,7 +12,74 @@ st.markdown("""
         background-color: #4a2c1a !important;
         background-image: linear-gradient(135deg, #4a2c1a 0%, #6b3a2a 100%) !important;
     }
-    ... (ostatak CSS-a) ...
+    
+    .stMetric > div {
+        background-color: #87CEEB !important;
+        border-radius: 10px !important;
+        padding: 10px !important;
+        border: 2px solid #d4af37 !important;
+    }
+    .stMetric > div > div {
+        color: #000000 !important;
+        font-weight: bold !important;
+    }
+    .stMetric > div > div > div {
+        color: #000000 !important;
+        font-weight: bold !important;
+    }
+    
+    .stButton > button {
+        background-color: #d4af37 !important;
+        color: #4a2c1a !important;
+        font-weight: bold !important;
+        border: 2px solid #b8960a !important;
+        border-radius: 8px !important;
+    }
+    .stButton > button:hover {
+        background-color: #e8c84a !important;
+        border-color: #d4af37 !important;
+    }
+    
+    .stTextInput > div > div > input {
+        color: #4a2c1a !important;
+        background-color: #ffffff !important;
+        border: 3px solid #d4af37 !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+    }
+    .stSelectbox > div > div > div {
+        color: #4a2c1a !important;
+        background-color: #ffffff !important;
+        border: 3px solid #d4af37 !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+    }
+    .stSelectbox > div > div > div > div {
+        background-color: #ffffff !important;
+        color: #4a2c1a !important;
+    }
+    div[data-baseweb="select"] ul {
+        background-color: #ffffff !important;
+    }
+    div[data-baseweb="select"] ul li {
+        color: #4a2c1a !important;
+    }
+    div[data-baseweb="select"] ul li:hover {
+        background-color: #d4af37 !important;
+        color: #ffffff !important;
+    }
+    
+    .stTextInput label, .stSelectbox label {
+        color: #d0d0d0 !important;
+        font-weight: bold !important;
+        font-size: 15px !important;
+    }
+    
+    h1, h2, h3, .stSubheader {
+        color: #d4af37 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -172,23 +239,26 @@ def osvezi_termine():
     return True
 
 def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
+    """Proverava da li ima dovoljno SLOBODNIH i NEPREKLAPAJUCIH slotova"""
+    
     broj_slotova = trajanje // INTERVAL_MIN
     if trajanje % INTERVAL_MIN != 0:
         broj_slotova += 1
     
     pocetak_dt = datetime.strptime(pocetak, "%H:%M")
     kraj_dt = pocetak_dt + timedelta(minutes=trajanje)
-    kraj = kraj_dt.strftime("%H:%M")
     
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
+    # 1. Proveri sve ZAUZETE termine na taj dan
     c.execute("""
         SELECT vreme, usluga FROM rezervacije 
         WHERE datum=? AND ime IS NOT NULL AND ime != ''
     """, (datum,))
     zauzeti = c.fetchall()
     
+    # 2. Proveri da li se novi termin preklapa SA BILO KOJIM zauzetim
     for zauzet_vreme, zauzeta_usluga in zauzeti:
         zauzet_dt = datetime.strptime(zauzet_vreme, "%H:%M")
         c.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (zauzeta_usluga,))
@@ -198,21 +268,24 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
             zauzet_trajanje = result[0]
             zauzet_kraj_dt = zauzet_dt + timedelta(minutes=zauzet_trajanje)
             
+            # Provera preklapanja:
             if not (kraj_dt <= zauzet_dt or pocetak_dt >= zauzet_kraj_dt):
                 conn.close()
-                return False
+                return False  # IMA PREKLAPANJA!
     
+    # 3. Proveri da li ima dovoljno SLOBODNIH slotova
     c.execute("""
         SELECT vreme FROM rezervacije 
         WHERE datum=? AND vreme >= ? AND vreme < ? AND ime IS NULL 
         ORDER BY vreme ASC
-    """, (datum, pocetak, kraj))
+    """, (datum, pocetak, kraj_dt.strftime("%H:%M")))
     slobodni = [row[0] for row in c.fetchall()]
     conn.close()
     
     if len(slobodni) < broj_slotova:
         return False
     
+    # Proveri da li su slotovi uzastopni (bez pauza)
     for i in range(broj_slotova - 1):
         t1 = datetime.strptime(slobodni[i], "%H:%M")
         t2 = datetime.strptime(slobodni[i+1], "%H:%M")
@@ -260,11 +333,12 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     return count > 0
 
 def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
+    """Prikazuje tabelu slotova - za klijenta ili admina"""
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
     c.execute("""
-        SELECT vreme, ime FROM rezervacije 
+        SELECT vreme, ime, usluga FROM rezervacije 
         WHERE datum=? 
         ORDER BY vreme ASC
     """, (datum,))
@@ -272,16 +346,30 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     conn.close()
     
     if not svi_slotovi:
-        st.warning("⏳ Nema slobodnih termina za izabrani datum.")
+        st.warning("⏳ Nema termina za izabrani datum.")
         return None
     
-    jedinstveni = {}
-    for vreme, ime in svi_slotovi:
-        if vreme not in jedinstveni:
-            jedinstveni[vreme] = ime
+    # Kreiraj mapu slotova sa trajanjem
+    slotovi_map = {}
+    for vreme, ime, usluga in svi_slotovi:
+        if vreme not in slotovi_map:
+            trajanje = 15  # default
+            if ime and ime != "" and usluga:
+                conn2 = sqlite3.connect('termini.db')
+                c2 = conn2.cursor()
+                c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
+                result = c2.fetchone()
+                conn2.close()
+                if result:
+                    trajanje = result[0]
+            slotovi_map[vreme] = {
+                'ime': ime,
+                'trajanje': trajanje if ime else 15,
+                'zauzet': ime is not None and ime != ""
+            }
     
-    svi_slotovi = list(jedinstveni.items())
-    svi_slotovi.sort()
+    # Sortiraj po vremenu
+    svi_slotovi = sorted(slotovi_map.items())
     
     cols_per_row = 4
     rows = [svi_slotovi[i:i+cols_per_row] for i in range(0, len(svi_slotovi), cols_per_row)]
@@ -290,9 +378,9 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     
     for row in rows:
         cols = st.columns(cols_per_row)
-        for j, (vreme, ime_slota) in enumerate(row):
+        for j, (vreme, info) in enumerate(row):
             with cols[j]:
-                if ime_slota is None or ime_slota == "":
+                if not info['zauzet']:
                     if mode == "admin":
                         st.markdown(f"""
                         <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
@@ -303,15 +391,22 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                         if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
                             kliknuto_vreme = vreme
                 else:
+                    # Pokaži i kraj termina
+                    kraj_vreme = vreme
+                    trajanje = info['trajanje']
+                    if trajanje > 0:
+                        pocetak_dt = datetime.strptime(vreme, "%H:%M")
+                        kraj_dt = pocetak_dt + timedelta(minutes=trajanje)
+                        kraj_vreme = kraj_dt.strftime("%H:%M")
+                    
                     st.markdown(f"""
                     <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
-                        🔴 {vreme}
+                        🔴 {vreme} - {kraj_vreme}
                     </div>
                     """, unsafe_allow_html=True)
     
     return kliknuto_vreme
 
-# ---------- UI ----------
 # ---------- UI ----------
 # LOGO
 st.markdown("""
