@@ -244,8 +244,9 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
             zauzet_trajanje = result[0]
             zauzet_kraj_dt = zauzet_dt + timedelta(minutes=zauzet_trajanje)
             
-            # Ako se novi termin preklapa sa zauzetim → odbij
-            if not (kraj_dt <= zauzet_dt or pocetak_dt >= zauzet_kraj_dt):
+            # Ako se novi termin preklapa SA BILO KOJIM zauzetim (uključujući i granične slučajeve)
+            # Dozvoli da se završi tačno kada počinje drugi (kraj_dt == zauzet_dt) ili obrnuto
+            if kraj_dt > zauzet_dt and pocetak_dt < zauzet_kraj_dt:
                 conn.close()
                 return False
     
@@ -269,7 +270,6 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
             return False
     
     return True
-
 def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
