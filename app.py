@@ -524,18 +524,26 @@ with tab2:
         
         st.divider()
         
+        # ---------- METRIKA - POPRAVLJENO BROJANJE ----------
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
         today = datetime.now().strftime("%Y-%m-%d")
         
+        # Broj jedinstvenih KLIJENATA danas (po imenu i telefonu)
         c.execute("""
-            SELECT COUNT(DISTINCT ime || '|' || telefon || '|' || datum || '|' || usluga) 
+            SELECT COUNT(DISTINCT ime || '|' || telefon) 
             FROM rezervacije 
-            WHERE datum=? AND ime IS NOT NULL
+            WHERE datum=? AND ime IS NOT NULL AND ime != ''
         """, (today,))
         danas_klijenata = c.fetchone()[0] or 0
         
-        c.execute("SELECT COUNT(*) FROM rezervacije WHERE ime IS NOT NULL AND (naplaceno IS NULL OR naplaceno=0)")
+        # Broj nenaplaćenih SLOTOVA (ne klijenata)
+        c.execute("""
+            SELECT COUNT(*) 
+            FROM rezervacije 
+            WHERE ime IS NOT NULL AND ime != '' 
+            AND (naplaceno IS NULL OR naplaceno=0)
+        """)
         nenaplaceno = c.fetchone()[0] or 0
         
         conn.close()
