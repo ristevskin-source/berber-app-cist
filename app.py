@@ -138,8 +138,8 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
             zauzet_trajanje = result[0]
             zauzet_kraj_dt = zauzet_dt + timedelta(minutes=zauzet_trajanje)
             
-            # Ako se novi termin preklapa sa zauzetim → odbij
-            if not (kraj_dt <= zauzet_dt or pocetak_dt >= zauzet_kraj_dt):
+            # Dozvoli da se termin završi tačno kada drugi počinje
+            if kraj_dt > zauzet_dt and pocetak_dt < zauzet_kraj_dt:
                 conn.close()
                 return False
     
@@ -315,10 +315,15 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
+            sva_polja_popunjena = ime and tel and ime.strip() and tel.strip()
+            
+            if not sva_polja_popunjena:
+                st.warning("⚠️ Popunite sva polja (Ime, Telefon, Usluga, Datum) pre nego što kliknete na termin.")
+            
             kliknuto_vreme = prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent")
             
             if kliknuto_vreme:
-                if ime and tel:
+                if sva_polja_popunjena:
                     if dovoljno_slobodnih_slotova(datum, kliknuto_vreme, usluga_trajanje):
                         if rezervisi_blok(datum, kliknuto_vreme, usluga_trajanje, ime, tel, usluga_ime, usluga_cena):
                             st.session_state['booking_success'] = True
@@ -338,7 +343,8 @@ with tab1:
                         st.error("❌ Nema dovoljno slobodnih termina za ovu uslugu u izabrano vreme.")
                         st.rerun()
                 else:
-                    st.warning("⚠️ Popunite ime i telefon pre nego što kliknete na termin.")
+                    st.error("❌ Popunite sva polja pre nego što kliknete na termin.")
+                    st.rerun()
         else:
             st.error("❌ Baza je prazna.")
 
@@ -519,7 +525,7 @@ with tab2:
         else:
             st.info("📭 Trenutno nema zakazanih klijenata.")
         
-        # ---------- TABELA TERMINA ZA ADMINA (NOVO!) ----------
+        # ---------- TABELA TERMINA ZA ADMINA ----------
         st.subheader("📋 Pregled termina (admin)")
         
         conn = sqlite3.connect('termini.db')
@@ -532,7 +538,6 @@ with tab2:
         if datumi_raw and usluge:
             admin_datum = st.selectbox("Izaberite datum za pregled", datumi_raw, format_func=formatiraj_datum, key="admin_datum_pregled")
             
-            # Prikaz tabele za admina (samo vizuelno, bez klika)
             st.write("**Status termina:**")
             st.markdown("""
             <div style="display: flex; gap: 10px; margin: 5px 0; font-size: 0.9em;">
@@ -541,7 +546,6 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
             
-            # Prikazujemo tabelu u admin modu (neklikabilno)
             prikazi_tabelu_termina(admin_datum, 0, mode="admin")
         
         # ---------- UPRAVLJANJE USLUGAMA ----------
