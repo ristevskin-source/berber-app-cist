@@ -227,12 +227,14 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
+    # Proveri sve ZAUZETE termine na taj dan
     c.execute("""
         SELECT vreme, usluga FROM rezervacije 
         WHERE datum=? AND ime IS NOT NULL AND ime != ''
     """, (datum,))
     zauzeti = c.fetchall()
     
+    # Proveri da li se novi termin preklapa SA BILO KOJIM zauzetim
     for zauzet_vreme, zauzeta_usluga in zauzeti:
         zauzet_dt = datetime.strptime(zauzet_vreme, "%H:%M")
         c.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (zauzeta_usluga,))
@@ -242,10 +244,12 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
             zauzet_trajanje = result[0]
             zauzet_kraj_dt = zauzet_dt + timedelta(minutes=zauzet_trajanje)
             
+            # Ako se novi termin preklapa sa zauzetim → odbij
             if not (kraj_dt <= zauzet_dt or pocetak_dt >= zauzet_kraj_dt):
                 conn.close()
                 return False
     
+    # Proveri da li ima dovoljno SLOBODNIH slotova
     c.execute("""
         SELECT vreme FROM rezervacije 
         WHERE datum=? AND vreme >= ? AND vreme < ? AND ime IS NULL 
@@ -257,6 +261,7 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     if len(slobodni) < broj_slotova:
         return False
     
+    # Proveri da li su slotovi uzastopni (bez pauza)
     for i in range(broj_slotova - 1):
         t1 = datetime.strptime(slobodni[i], "%H:%M")
         t2 = datetime.strptime(slobodni[i+1], "%H:%M")
@@ -369,7 +374,11 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                     # ZAUZET TERMIN - prikaži tačan opseg
                     pocetak_dt = datetime.strptime(slot['vreme'], "%H:%M")
                     kraj_dt = pocetak_dt + timedelta(minutes=slot['trajanje'])
-                    kraj_vreme = kraj_dt.strftime("%H:%M")
+                    
+                    # Osiguraj da je kraj ispravno formatiran (2 cifre za minute)
+                    sati = kraj_dt.hour
+                    minute = str(kraj_dt.minute).zfill(2)
+                    kraj_vreme = f"{sati}:{minute}"
                     
                     st.markdown(f"""
                     <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
