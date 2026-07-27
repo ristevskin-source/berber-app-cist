@@ -344,10 +344,9 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
         st.warning("⏳ Nema termina za izabrani datum.")
         return None
     
-    # Prvo napravi listu svih slotova sa njihovim statusom
     slotovi_lista = []
     for vreme, ime, usluga in svi_slotovi:
-        trajanje = 15  # default za slobodan slot
+        trajanje = 15
         if ime and ime != "" and usluga:
             conn2 = sqlite3.connect('termini.db')
             c2 = conn2.cursor()
@@ -365,10 +364,8 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
             'zauzet': ime is not None and ime != ""
         })
     
-    # Sortiraj po vremenu
     slotovi_lista.sort(key=lambda x: x['vreme'])
     
-    # Kreiraj prikaz za svaki slot
     cols_per_row = 4
     rows = [slotovi_lista[i:i+cols_per_row] for i in range(0, len(slotovi_lista), cols_per_row)]
     
@@ -379,7 +376,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
         for j, slot in enumerate(row):
             with cols[j]:
                 if not slot['zauzet']:
-                    # SLOBODAN TERMIN
                     if mode == "admin":
                         st.markdown(f"""
                         <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
@@ -390,7 +386,6 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                         if st.button(f"🟢 {slot['vreme']}", key=f"slot_{datum}_{slot['vreme']}", use_container_width=True):
                             kliknuto_vreme = slot['vreme']
                 else:
-                    # ZAUZET TERMIN - prikaži tačan opseg
                     pocetak_dt = datetime.strptime(slot['vreme'], "%H:%M")
                     kraj_dt = pocetak_dt + timedelta(minutes=slot['trajanje'])
                     kraj_vreme = kraj_dt.strftime("%H:%M")
@@ -480,7 +475,6 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
-            # Proveri da li su sva polja popunjena
             sva_polja_popunjena = ime and tel and ime.strip() and tel.strip()
             
             if not sva_polja_popunjena:
