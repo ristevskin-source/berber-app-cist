@@ -309,12 +309,12 @@ def rezervisi_blok(datum, pocetak, trajanje, ime, telefon, usluga, cena):
     return count > 0
 
 def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
-    """Prikazuje tabelu slotova - za klijenta ili admina"""
+    """Prikazuje tabelu slotova - svaki slot posebno (zauzet ili slobodan)"""
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
     
     c.execute("""
-        SELECT vreme, ime, usluga FROM rezervacije 
+        SELECT vreme, ime FROM rezervacije 
         WHERE datum=? 
         ORDER BY vreme ASC
     """, (datum,))
@@ -325,31 +325,18 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
         st.warning("⏳ Nema termina za izabrani datum.")
         return None
     
-    # Prvo napravi listu svih slotova sa tačnim trajanjem
+    # Kreiraj listu slotova (svaki slot je 15 minuta)
     slotovi_lista = []
-    for vreme, ime, usluga in svi_slotovi:
-        trajanje = 15  # default za slobodan slot
-        if ime and ime != "" and usluga:
-            conn2 = sqlite3.connect('termini.db')
-            c2 = conn2.cursor()
-            c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
-            result = c2.fetchone()
-            conn2.close()
-            if result:
-                trajanje = result[0]
-        
+    for vreme, ime in svi_slotovi:
         slotovi_lista.append({
             'vreme': vreme,
-            'ime': ime,
-            'usluga': usluga,
-            'trajanje': trajanje if ime else 15,
             'zauzet': ime is not None and ime != ""
         })
     
     # Sortiraj po vremenu
     slotovi_lista.sort(key=lambda x: x['vreme'])
     
-    # Kreiraj prikaz za svaki slot
+    # Podeli u redove po 4
     cols_per_row = 4
     rows = [slotovi_lista[i:i+cols_per_row] for i in range(0, len(slotovi_lista), cols_per_row)]
     
@@ -371,23 +358,14 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
                         if st.button(f"🟢 {slot['vreme']}", key=f"slot_{datum}_{slot['vreme']}", use_container_width=True):
                             kliknuto_vreme = slot['vreme']
                 else:
-                    # ZAUZET TERMIN - prikaži tačan opseg
-                    pocetak_dt = datetime.strptime(slot['vreme'], "%H:%M")
-                    kraj_dt = pocetak_dt + timedelta(minutes=slot['trajanje'])
-                    
-                    # Osiguraj da je kraj ispravno formatiran (2 cifre za minute)
-                    sati = kraj_dt.hour
-                    minute = str(kraj_dt.minute).zfill(2)
-                    kraj_vreme = f"{sati}:{minute}"
-                    
+                    # ZAUZET TERMIN - prikaži samo vreme (bez kraja)
                     st.markdown(f"""
                     <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
-                        🔴 {slot['vreme']} - {kraj_vreme}
+                        🔴 {slot['vreme']}
                     </div>
                     """, unsafe_allow_html=True)
     
     return kliknuto_vreme
-
 # ---------- UI ----------
 # LOGO
 st.markdown("""
