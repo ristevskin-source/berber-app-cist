@@ -320,32 +320,31 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
         st.warning("⏳ Nema termina za izabrani datum.")
         return None
     
-    # Kreiraj mapu slotova (jedinstveni po vremenu)
-    slotovi_map = {}
+    # Prvo napravi listu svih slotova sa tačnim trajanjem
+    slotovi_lista = []
     for vreme, ime, usluga in svi_slotovi:
-        if vreme not in slotovi_map:
-            trajanje = 15  # default
-            if ime and ime != "" and usluga:
-                conn2 = sqlite3.connect('termini.db')
-                c2 = conn2.cursor()
-                c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
-                result = c2.fetchone()
-                conn2.close()
-                if result:
-                    trajanje = result[0]
-            
-            slotovi_map[vreme] = {
-                'vreme': vreme,
-                'ime': ime,
-                'usluga': usluga,
-                'trajanje': trajanje if ime else 15,
-                'zauzet': ime is not None and ime != ""
-            }
+        trajanje = 15  # default za slobodan slot
+        if ime and ime != "" and usluga:
+            conn2 = sqlite3.connect('termini.db')
+            c2 = conn2.cursor()
+            c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
+            result = c2.fetchone()
+            conn2.close()
+            if result:
+                trajanje = result[0]
+        
+        slotovi_lista.append({
+            'vreme': vreme,
+            'ime': ime,
+            'usluga': usluga,
+            'trajanje': trajanje if ime else 15,
+            'zauzet': ime is not None and ime != ""
+        })
     
     # Sortiraj po vremenu
-    slotovi_lista = sorted(slotovi_map.values(), key=lambda x: x['vreme'])
+    slotovi_lista.sort(key=lambda x: x['vreme'])
     
-    # Podeli u redove po 4
+    # Kreiraj prikaz za svaki slot
     cols_per_row = 4
     rows = [slotovi_lista[i:i+cols_per_row] for i in range(0, len(slotovi_lista), cols_per_row)]
     
