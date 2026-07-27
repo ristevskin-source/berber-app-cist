@@ -247,6 +247,7 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
     
     pocetak_dt = datetime.strptime(pocetak, "%H:%M")
     kraj_dt = pocetak_dt + timedelta(minutes=trajanje)
+    kraj = kraj_dt.strftime("%H:%M")
     
     conn = sqlite3.connect('termini.db')
     c = conn.cursor()
@@ -274,7 +275,7 @@ def dovoljno_slobodnih_slotova(datum, pocetak, trajanje):
         SELECT vreme FROM rezervacije 
         WHERE datum=? AND vreme >= ? AND vreme < ? AND ime IS NULL 
         ORDER BY vreme ASC
-    """, (datum, pocetak, kraj_dt.strftime("%H:%M")))
+    """, (datum, pocetak, kraj))
     slobodni = [row[0] for row in c.fetchall()]
     conn.close()
     
@@ -333,7 +334,7 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     c = conn.cursor()
     
     c.execute("""
-        SELECT vreme, ime, usluga FROM rezervacije 
+        SELECT vreme, ime FROM rezervacije 
         WHERE datum=? 
         ORDER BY vreme ASC
     """, (datum,))
@@ -341,58 +342,40 @@ def prikazi_tabelu_termina(datum, usluga_trajanje, mode="klijent"):
     conn.close()
     
     if not svi_slotovi:
-        st.warning("⏳ Nema termina za izabrani datum.")
+        st.warning("⏳ Nema slobodnih termina za izabrani datum.")
         return None
     
-    slotovi_lista = []
-    for vreme, ime, usluga in svi_slotovi:
-        trajanje = 15
-        if ime and ime != "" and usluga:
-            conn2 = sqlite3.connect('termini.db')
-            c2 = conn2.cursor()
-            c2.execute("SELECT trajanje FROM cenovnik WHERE usluga=?", (usluga,))
-            result = c2.fetchone()
-            conn2.close()
-            if result:
-                trajanje = result[0]
-        
-        slotovi_lista.append({
-            'vreme': vreme,
-            'ime': ime,
-            'usluga': usluga,
-            'trajanje': trajanje if ime else 15,
-            'zauzet': ime is not None and ime != ""
-        })
+    jedinstveni = {}
+    for vreme, ime in svi_slotovi:
+        if vreme not in jedinstveni:
+            jedinstveni[vreme] = ime
     
-    slotovi_lista.sort(key=lambda x: x['vreme'])
+    svi_slotovi = list(jedinstveni.items())
+    svi_slotovi.sort()
     
     cols_per_row = 4
-    rows = [slotovi_lista[i:i+cols_per_row] for i in range(0, len(slotovi_lista), cols_per_row)]
+    rows = [svi_slotovi[i:i+cols_per_row] for i in range(0, len(svi_slotovi), cols_per_row)]
     
     kliknuto_vreme = None
     
     for row in rows:
         cols = st.columns(cols_per_row)
-        for j, slot in enumerate(row):
+        for j, (vreme, ime_slota) in enumerate(row):
             with cols[j]:
-                if not slot['zauzet']:
+                if ime_slota is None or ime_slota == "":
                     if mode == "admin":
                         st.markdown(f"""
                         <div style="background-color:#2a7a2a; color:white; border:1px solid #4ac24a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; opacity:0.8;">
-                            🟢 {slot['vreme']}
+                            🟢 {vreme}
                         </div>
                         """, unsafe_allow_html=True)
                     else:
-                        if st.button(f"🟢 {slot['vreme']}", key=f"slot_{datum}_{slot['vreme']}", use_container_width=True):
-                            kliknuto_vreme = slot['vreme']
+                        if st.button(f"🟢 {vreme}", key=f"slot_{datum}_{vreme}", use_container_width=True):
+                            kliknuto_vreme = vreme
                 else:
-                    pocetak_dt = datetime.strptime(slot['vreme'], "%H:%M")
-                    kraj_dt = pocetak_dt + timedelta(minutes=slot['trajanje'])
-                    kraj_vreme = kraj_dt.strftime("%H:%M")
-                    
                     st.markdown(f"""
                     <div style="background-color:#7a2a2a; color:#aaaaaa; border:1px solid #aa4a4a; border-radius:8px; padding:8px 0; text-align:center; width:100%; font-weight:bold; cursor:not-allowed; opacity:0.7;">
-                        🔴 {slot['vreme']} - {kraj_vreme}
+                        🔴 {vreme}
                     </div>
                     """, unsafe_allow_html=True)
     
@@ -475,6 +458,7 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
+            # Proveri da li su sva polja popunjena
             sva_polja_popunjena = ime and tel and ime.strip() and tel.strip()
             
             if not sva_polja_popunjena:
@@ -608,118 +592,94 @@ with tab2:
         else:
             st.info("📭 Još uvek nema naplaćenih usluga.")
         
-        # ---------- ZAKAZANI KLIJENTI - FILTER PO DATUMU ----------
         st.subheader("📋 Zakazani klijenti")
-
+        
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
-        c.execute("SELECT DISTINCT datum FROM rezervacije WHERE ime IS NOT NULL ORDER BY datum ASC")
-        dostupni_datumi = [row[0] for row in c.fetchall()]
+        c.execute("""
+            SELECT ime, telefon, usluga, cena, datum, 
+                   MIN(vreme) as pocetak, MAX(vreme) as kraj,
+                   GROUP_CONCAT(id) as ids,
+                   COUNT(*) as broj_slotova
+            FROM rezervacije 
+            WHERE ime IS NOT NULL 
+            GROUP BY ime, telefon, datum, usluga, cena
+            ORDER BY datum || ' ' || MIN(vreme) ASC
+        """)
+        grupe = c.fetchall()
         conn.close()
-
-        if dostupni_datumi:
-            izabrani_datum = st.selectbox(
-                "Izaberite datum za pregled",
-                dostupni_datumi,
-                format_func=formatiraj_datum,
-                key="admin_klijenti_datum"
-            )
-            
-            conn = sqlite3.connect('termini.db')
-            c = conn.cursor()
-            c.execute("""
-                SELECT ime, telefon, usluga, cena, datum, 
-                       MIN(vreme) as pocetak, MAX(vreme) as kraj,
-                       GROUP_CONCAT(id) as ids,
-                       COUNT(*) as broj_slotova
-                FROM rezervacije 
-                WHERE ime IS NOT NULL AND datum=?
-                GROUP BY ime, telefon, datum, usluga, cena
-                ORDER BY MIN(vreme) ASC
-            """, (izabrani_datum,))
-            grupe = c.fetchall()
-            conn.close()
-            
-            if grupe:
-                for idx, red in enumerate(grupe, start=1):
-                    ime, telefon, usluga, cena, datum, pocetak, kraj, ids, broj_slotova = red
-                    
-                    t1 = datetime.strptime(pocetak, "%H:%M")
-                    t2 = datetime.strptime(kraj, "%H:%M")
-                    trajanje = (t2 - t1).seconds // 60 + INTERVAL_MIN
-                    
-                    st.markdown(f"""
-                    <div style="background-color:#3a3a3a; border-radius:12px; padding:12px 16px; margin:8px 0; border:2px solid #d4af37; box-shadow:0 2px 8px rgba(212,175,55,0.15);">
-                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                            <span style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                                <span style="color: #d4af37; font-weight: bold;">#{idx}</span>
-                                <span style="color: #ffffff; font-weight: bold;">{ime}</span>
-                                <span style="color: #d0d0d0;">📞 {telefon}</span>
-                                <span style="color: #d0d0d0;">✂️ {usluga}</span>
-                                <span style="color: #d0d0d0;">⏰ {pocetak} - {kraj} ({trajanje} min)</span>
-                                <span style="color: #d4af37; font-weight: bold;">{cena} din</span>
-                            </span>
-                            <span>
-                    """, unsafe_allow_html=True)
-                    
-                    first_id = int(ids.split(',')[0])
-                    conn2 = sqlite3.connect('termini.db')
-                    c2 = conn2.cursor()
-                    c2.execute("SELECT naplaceno FROM rezervacije WHERE id=?", (first_id,))
-                    naplaceno = c2.fetchone()[0]
-                    conn2.close()
-                    
-                    if naplaceno == 1:
-                        st.markdown('<span style="color: #4ac24a;">✅ Naplaćeno</span>', unsafe_allow_html=True)
-                    else:
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button(f"💰 Naplati", key=f"pay_{idx}"):
-                                conn3 = sqlite3.connect('termini.db')
-                                c3 = conn3.cursor()
-                                for id in ids.split(','):
-                                    c3.execute("UPDATE rezervacije SET naplaceno=1, datum_naplate=? WHERE id=?", (datetime.now().strftime("%Y-%m-%d"), int(id)))
-                                conn3.commit()
-                                conn3.close()
-                                st.success(f"✅ Naplaćeno: {ime}")
-                                st.rerun()
-                        with col2:
-                            if st.button(f"🗑️ Otkaži", key=f"cancel_{idx}"):
-                                conn4 = sqlite3.connect('termini.db')
-                                c4 = conn4.cursor()
-                                for id in ids.split(','):
-                                    c4.execute("UPDATE rezervacije SET ime=NULL, telefon=NULL, usluga=NULL, cena=NULL, naplaceno=0 WHERE id=?", (int(id),))
-                                conn4.commit()
-                                conn4.close()
-                                st.success(f"🗑️ Otkazano: {ime}")
-                                st.rerun()
-                    
-                    st.markdown("""
-                            </span>
-                        </div>
+        
+        if grupe:
+            for idx, red in enumerate(grupe, start=1):
+                ime, telefon, usluga, cena, datum, pocetak, kraj, ids, broj_slotova = red
+                
+                t1 = datetime.strptime(pocetak, "%H:%M")
+                t2 = datetime.strptime(kraj, "%H:%M")
+                trajanje = (t2 - t1).seconds // 60 + INTERVAL_MIN
+                
+                st.markdown(f"""
+                <div style="background-color:#3a3a3a; border-radius:12px; padding:12px 16px; margin:8px 0; border:2px solid #d4af37; box-shadow:0 2px 8px rgba(212,175,55,0.15);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <span style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <span style="color: #d4af37; font-weight: bold;">#{idx}</span>
+                            <span style="color: #ffffff; font-weight: bold;">{ime}</span>
+                            <span style="color: #d0d0d0;">📞 {telefon}</span>
+                            <span style="color: #d0d0d0;">✂️ {usluga}</span>
+                            <span style="color: #d0d0d0;">📅 {formatiraj_datum(datum)}</span>
+                            <span style="color: #d0d0d0;">⏰ {pocetak} - {kraj} ({trajanje} min)</span>
+                            <span style="color: #d4af37; font-weight: bold;">{cena} din</span>
+                        </span>
+                        <span>
+                """, unsafe_allow_html=True)
+                
+                first_id = int(ids.split(',')[0])
+                conn2 = sqlite3.connect('termini.db')
+                c2 = conn2.cursor()
+                c2.execute("SELECT naplaceno FROM rezervacije WHERE id=?", (first_id,))
+                naplaceno = c2.fetchone()[0]
+                conn2.close()
+                
+                if naplaceno == 1:
+                    st.markdown('<span style="color: #4ac24a;">✅ Naplaćeno</span>', unsafe_allow_html=True)
+                else:
+                    if st.button(f"💰 Naplati", key=f"pay_{idx}"):
+                        conn3 = sqlite3.connect('termini.db')
+                        c3 = conn3.cursor()
+                        for id in ids.split(','):
+                            c3.execute("UPDATE rezervacije SET naplaceno=1, datum_naplate=? WHERE id=?", (datetime.now().strftime("%Y-%m-%d"), int(id)))
+                        conn3.commit()
+                        conn3.close()
+                        st.success(f"✅ Naplaćeno: {ime}")
+                        st.rerun()
+                    if st.button(f"🗑️ Otkaži", key=f"cancel_{idx}"):
+                        conn4 = sqlite3.connect('termini.db')
+                        c4 = conn4.cursor()
+                        for id in ids.split(','):
+                            c4.execute("UPDATE rezervacije SET ime=NULL, telefon=NULL, usluga=NULL, cena=NULL, naplaceno=0 WHERE id=?", (int(id),))
+                        conn4.commit()
+                        conn4.close()
+                        st.success(f"🗑️ Otkazano: {ime}")
+                        st.rerun()
+                
+                st.markdown("""
+                        </span>
                     </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info(f"📭 Nema zakazanih klijenata za {formatiraj_datum(izabrani_datum)}.")
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("📭 Trenutno nema zakazanih klijenata.")
         
-        # ---------- TABELA TERMINA ZA ADMINA ----------
         st.subheader("📋 Pregled termina (admin)")
         
         conn = sqlite3.connect('termini.db')
         c = conn.cursor()
-        c.execute("SELECT DISTINCT datum FROM rezervacije ORDER BY datum ASC")
-        svi_datumi = [row[0] for row in c.fetchall()]
+        datumi_raw = generisi_datume()
+        c.execute("SELECT usluga, cena, trajanje FROM cenovnik ORDER BY trajanje ASC")
+        usluge = c.fetchall()
         conn.close()
-
-        if svi_datumi:
-            admin_datum = st.selectbox(
-                "Izaberite datum za pregled", 
-                svi_datumi, 
-                format_func=formatiraj_datum, 
-                key="admin_datum_pregled"
-            )
+        
+        if datumi_raw and usluge:
+            admin_datum = st.selectbox("Izaberite datum za pregled", datumi_raw, format_func=formatiraj_datum, key="admin_datum_pregled")
             
             st.write("**Status termina:**")
             st.markdown("""
@@ -730,10 +690,7 @@ with tab2:
             """, unsafe_allow_html=True)
             
             prikazi_tabelu_termina(admin_datum, 0, mode="admin")
-        else:
-            st.info("📭 Trenutno nema termina ni za jedan dan.")
         
-        # ---------- UPRAVLJANJE USLUGAMA ----------
         st.subheader("📝 Upravljanje uslugama")
         
         with st.form("dodaj_uslugu"):
